@@ -345,17 +345,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
         if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) && (int)$_FILES['menu_image']['size'] <= 10 * 1024 * 1024) {
             move_uploaded_file($tmp, $menuFile);
         }
-    } elseif ($action === 'set_deadline') {
-        $value = trim((string)($_POST['order_deadline'] ?? ''));
-        if ($value !== '') {
-            $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $value, new DateTimeZone('Asia/Taipei'));
-            if (!$date || $date->format('Y-m-d\TH:i') !== $value) {
-                http_response_code(422);
-                exit('Invalid deadline');
-            }
-        }
-        $settings['order_deadline'] = $value;
-        saveSettings($settingsFile, $settings);
     } elseif ($action === 'set_balance') {
         $name = trim((string)($_POST['balance_user'] ?? ''));
         $targetBalance = filter_var($_POST['target_balance'] ?? null, FILTER_VALIDATE_INT);
@@ -386,6 +375,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
             exit('Invalid organizer');
         }
         $settings['organizer'] = $organizer;
+        $deadlineValue = isset($_POST['clear_deadline'])
+            ? ''
+            : trim((string)($_POST['order_deadline'] ?? ''));
+        if ($deadlineValue !== '') {
+            $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $deadlineValue, new DateTimeZone('Asia/Taipei'));
+            if (!$date || $date->format('Y-m-d\TH:i') !== $deadlineValue) {
+                http_response_code(422);
+                exit('Invalid deadline');
+            }
+        }
+        $settings['order_deadline'] = $deadlineValue;
         if (isset($_FILES['menu_image']) && $_FILES['menu_image']['error'] !== UPLOAD_ERR_NO_FILE) {
             $tmp = $_FILES['menu_image']['tmp_name'];
             $mime = is_uploaded_file($tmp) ? mime_content_type($tmp) : '';
@@ -458,9 +458,15 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <label>開團人</label>
 <input type="text" name="organizer" maxlength="50" value="<?= h((string)($settings['organizer'] ?? '')) ?>" placeholder="請輸入開團人姓名" required>
+<label>訂單截止時間（台北時間）</label>
+<input type="datetime-local" name="order_deadline" value="<?= h((string)($settings['order_deadline'] ?? '')) ?>">
+<label style="display:flex;align-items:center;gap:8px;margin-top:10px;text-transform:none">
+<input type="checkbox" name="clear_deadline" value="1" style="width:auto;margin:0">
+清除截止時間（不限時）
+</label>
 <label>選擇菜單圖片（可只更新開團人）</label>
 <input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp">
-<button name="public_action" value="update_group">儲存開團資料／上傳菜單</button>
+<button name="public_action" value="update_group">儲存開團人、截止時間與菜單</button>
 </form>
 </div>
 <div class="box">
@@ -496,15 +502,6 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <?php if (!empty($_SESSION['is_admin'])): ?>
 <div class="box admin">
 <h2>管理員</h2>
-<form method="post">
-<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<label>訂單截止時間（台北時間）</label>
-<input type="datetime-local" name="order_deadline" value="<?= h((string)($settings['order_deadline'] ?? '')) ?>">
-<div class="actions">
-<button name="admin_action" value="set_deadline">儲存截止時間</button>
-<button class="danger" name="admin_action" value="set_deadline" onclick="this.form.order_deadline.value=''">清除截止時間</button>
-</div>
-</form>
 <form method="post">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <label>修改個人目前餘額</label>
