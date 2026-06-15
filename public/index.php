@@ -14,11 +14,13 @@ $usersFile = $dataDir . '/users.json';
 $historyDir = $dataDir . '/history';
 $menuFile = $dataDir . '/menu';
 $settingsFile = $dataDir . '/settings.json';
+$menuLibraryDir = $dataDir . '/menu_library';
+$menuLibraryFile = $dataDir . '/menu_library.json';
 $appPassword = getenv('APP_PASSWORD') ?: '';
 $adminUser = getenv('ADMIN_USER') ?: 'admin';
 $adminPassword = getenv('ADMIN_PASSWORD') ?: '';
 
-foreach ([$dataDir, $historyDir] as $dir) {
+foreach ([$dataDir, $historyDir, $menuLibraryDir] as $dir) {
     if (!is_dir($dir) && !mkdir($dir, 0770, true) && !is_dir($dir)) {
         http_response_code(500);
         exit('Unable to initialize data directory.');
@@ -71,6 +73,43 @@ function saveSettings(string $file, array $settings): void
     $tmp = $file . '.tmp';
     file_put_contents($tmp, json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
     rename($tmp, $file);
+}
+
+function loadMenuLibrary(string $file): array
+{
+    if (!is_file($file)) {
+        return [];
+    }
+    $items = json_decode((string)file_get_contents($file), true);
+    return is_array($items) ? $items : [];
+}
+
+function saveMenuLibrary(string $file, array $items): void
+{
+    $tmp = $file . '.tmp';
+    file_put_contents($tmp, json_encode($items, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
+    rename($tmp, $file);
+}
+
+function menuLabel(string $label, string $fallback): string
+{
+    $label = trim($label);
+    if ($label === '') {
+        $label = trim(pathinfo($fallback, PATHINFO_FILENAME));
+    }
+    if ($label === '') {
+        $label = '未命名菜單';
+    }
+    return mb_substr($label, 0, 60);
+}
+
+function menuExtension(string $mime): string
+{
+    return match ($mime) {
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        default => 'jpg',
+    };
 }
 
 function deadlineTimestamp(array $settings): ?int
@@ -233,6 +272,7 @@ if (isset($_GET['download_csv'])) {
 $users = loadUsers($usersFile);
 $orders = loadOrders($ordersFile);
 $settings = loadSettings($settingsFile);
+$menuLibrary = loadMenuLibrary($menuLibraryFile);
 $deadline = deadlineTimestamp($settings);
 $ordersClosed = $deadline !== null && time() >= $deadline;
 $message = '';
@@ -379,6 +419,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
         exit('Invalid request');
     }
     $publicAction = (string)$_POST['public_action'];
+    if ($publicAction === 'rename_menu') {
+        $menuId = trim((string)($_POST['history_menu_id'] ?? ''));
+        $newName = menuLabel((string)($_POST['history_menu_name'] ?? ''), '歷史菜單');
+        if ($menuId !== '' && isset($menuLibrary[$menuId])) {
+            $menuLibrary[$menuId]['name'] = $newName;
+            saveMenuLibrary($menuLibraryFile, $menuLibrary);
+        }
+        header('Location: /');
+        exit;
+    }
     if ($publicAction === 'settle_group') {
         $organizer = (string)($settings['organizer'] ?? '');
         if ($organizer === '' || !array_key_exists($organizer, $users)) {
@@ -420,6 +470,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
             }
         }
         $settings['order_deadline'] = $deadlineValue;
+        $selectedHistoryMenu = trim((string)($_POST['history_menu_id'] ?? ''));
+        if (
+            $selectedHistoryMenu !== ''
+            && isset($menuLibrary[$selectedHistoryMenu])
+            && is_file($menuLibraryDir . '/' . ($menuLibrary[$selectedHistoryMenu]['file'] ?? ''))
+        ) {
+            copy($menuLibraryDir . '/' . $menuLibrary[$selectedHistoryMenu]['file'], $menuFile);
+        }
         if (isset($_FILES['menu_image']) && $_FILES['menu_image']['error'] !== UPLOAD_ERR_NO_FILE) {
             $tmp = $_FILES['menu_image']['tmp_name'];
             $mime = is_uploaded_file($tmp) ? mime_content_type($tmp) : '';
@@ -430,7 +488,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
                 http_response_code(422);
                 exit('Invalid menu image');
             }
-            move_uploaded_file($tmp, $menuFile);
+            $menuId = date('YmdHis') . '_' . bin2hex(random_bytes(4));
+            $extension = menuExtension($mime);
+            $libraryFile = $menuId . '.' . $extension;
+            $libraryPath = $menuLibraryDir . '/' . $libraryFile;
+            move_uploaded_file($tmp, $libraryPath);
+            copy($libraryPath, $menuFile);
+            $menuLibrary[$menuId] = [
+                'name' => menuLabel((string)($_POST['menu_label'] ?? ''), (string)($_FILES['menu_image']['name'] ?? '')),
+                'file' => $libraryFile,
+                'mime' => $mime,
+                'created_at' => date('Y-m-d H:i:s'),
+            ];
+            saveMenuLibrary($menuLibraryFile, $menuLibrary);
         }
         saveSettings($settingsFile, $settings);
     }
@@ -441,6 +511,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
 $users = loadUsers($usersFile);
 $orders = loadOrders($ordersFile);
 $settings = loadSettings($settingsFile);
+$menuLibrary = loadMenuLibrary($menuLibraryFile);
 $deadline = deadlineTimestamp($settings);
 $ordersClosed = $deadline !== null && time() >= $deadline;
 $deadlineValue = (string)($settings['order_deadline'] ?? '');
@@ -529,10 +600,33 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <?php endforeach; ?>
 </select>
 </div>
+<?php if ($menuLibrary): ?>
+<label>歷史菜單</label>
+<select name="history_menu_id">
+<option value="">不變更目前菜單</option>
+<?php foreach (array_reverse($menuLibrary, true) as $menuId => $menuItem): ?>
+<option value="<?= h($menuId) ?>"><?= h($menuItem['name'] ?? '未命名菜單') ?></option>
+<?php endforeach; ?>
+</select>
+<?php endif; ?>
 <label>選擇菜單圖片（可只更新開團人）</label>
 <input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp">
+<input type="text" name="menu_label" maxlength="60" placeholder="新菜單名稱（上傳新圖片時保存到歷史）">
 <button name="public_action" value="update_group">儲存開團人、截止時間與菜單</button>
 </form>
+<?php if ($menuLibrary): ?>
+<form method="post">
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<label>編輯歷史菜單名稱</label>
+<select name="history_menu_id" required>
+<?php foreach (array_reverse($menuLibrary, true) as $menuId => $menuItem): ?>
+<option value="<?= h($menuId) ?>"><?= h($menuItem['name'] ?? '未命名菜單') ?></option>
+<?php endforeach; ?>
+</select>
+<input type="text" name="history_menu_name" maxlength="60" placeholder="新的菜單名稱" required>
+<button name="public_action" value="rename_menu">更新歷史菜單名稱</button>
+</form>
+<?php endif; ?>
 <form method="post" onsubmit="return confirm('確定結單？這會扣除本團消費、歸檔所有訂單，並下載 CSV 到這台電腦。')">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <button class="success" name="public_action" value="settle_group" <?= $orders ? '' : 'disabled' ?>>結單並下載 CSV</button>
