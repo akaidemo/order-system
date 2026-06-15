@@ -470,6 +470,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
             }
         }
         $settings['order_deadline'] = $deadlineValue;
+        saveSettings($settingsFile, $settings);
+    }
+    if ($publicAction === 'update_menu') {
         $selectedHistoryMenu = trim((string)($_POST['history_menu_id'] ?? ''));
         if (
             $selectedHistoryMenu !== ''
@@ -502,7 +505,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
             ];
             saveMenuLibrary($menuLibraryFile, $menuLibrary);
         }
-        saveSettings($settingsFile, $settings);
     }
     header('Location: /');
     exit;
@@ -600,19 +602,26 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <?php endforeach; ?>
 </select>
 </div>
+<button name="public_action" value="update_group">儲存開團人與截止時間</button>
+</form>
+</div>
+<div class="box">
+<h2>菜單管理</h2>
+<form method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <?php if ($menuLibrary): ?>
 <label>歷史菜單</label>
 <select name="history_menu_id">
-<option value="">不變更目前菜單</option>
+<option value="">不套用歷史菜單</option>
 <?php foreach (array_reverse($menuLibrary, true) as $menuId => $menuItem): ?>
 <option value="<?= h($menuId) ?>"><?= h($menuItem['name'] ?? '未命名菜單') ?></option>
 <?php endforeach; ?>
 </select>
 <?php endif; ?>
-<label>選擇菜單圖片（可只更新開團人）</label>
+<label>上傳新菜單圖片</label>
 <input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp">
-<input type="text" name="menu_label" maxlength="60" placeholder="新菜單名稱（上傳新圖片時保存到歷史）">
-<button name="public_action" value="update_group">儲存開團人、截止時間與菜單</button>
+<input type="text" name="menu_label" maxlength="60" placeholder="新菜單名稱（上傳後保存到歷史）">
+<button name="public_action" value="update_menu">套用歷史菜單／上傳新菜單</button>
 </form>
 <?php if ($menuLibrary): ?>
 <form method="post">
@@ -627,6 +636,8 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <button name="public_action" value="rename_menu">更新歷史菜單名稱</button>
 </form>
 <?php endif; ?>
+</div>
+<div class="box">
 <form method="post" onsubmit="return confirm('確定結單？這會扣除本團消費、歸檔所有訂單，並下載 CSV 到這台電腦。')">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <button class="success" name="public_action" value="settle_group" <?= $orders ? '' : 'disabled' ?>>結單並下載 CSV</button>
