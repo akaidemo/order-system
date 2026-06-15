@@ -34,3 +34,10 @@ docker compose up --build
 ## 舊資料
 
 `seed/` 只保留於交付壓縮檔，不應提交 GitHub。首次部署後，把該資料夾內的檔案上傳到 Railway Volume 的 `/data`，將 `menu.jpg` 改名為 `menu`，並將 `history/` 放到 `/data/history/`。
+
+## 管理功能
+
+- 管理員可設定或清除訂單截止時間（台北時間）。
+- 截止後一般使用者不能新增、修改或刪除訂單。
+- 管理員可將指定使用者的目前餘額直接修改成目標金額。
+- 通過公司共用密碼的開團人可填寫姓名並上傳 JPG、PNG 或 WebP 菜單。
