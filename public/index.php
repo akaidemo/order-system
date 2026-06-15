@@ -13,6 +13,7 @@ $ordersFile = $dataDir . '/orders.txt';
 $usersFile = $dataDir . '/users.json';
 $historyDir = $dataDir . '/history';
 $menuFile = $dataDir . '/menu';
+$settingsFile = $dataDir . '/settings.json';
 $appPassword = getenv('APP_PASSWORD') ?: '';
 $adminUser = getenv('ADMIN_USER') ?: 'admin';
 $adminPassword = getenv('ADMIN_PASSWORD') ?: '';
@@ -54,6 +55,32 @@ function saveUsers(string $file, array $users): void
     $tmp = $file . '.tmp';
     file_put_contents($tmp, json_encode($users, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
     rename($tmp, $file);
+}
+
+function loadSettings(string $file): array
+{
+    if (!is_file($file)) {
+        return ['order_deadline' => '', 'organizer' => ''];
+    }
+    $settings = json_decode((string)file_get_contents($file), true);
+    return is_array($settings) ? $settings : ['order_deadline' => '', 'organizer' => ''];
+}
+
+function saveSettings(string $file, array $settings): void
+{
+    $tmp = $file . '.tmp';
+    file_put_contents($tmp, json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
+    rename($tmp, $file);
+}
+
+function deadlineTimestamp(array $settings): ?int
+{
+    $value = trim((string)($settings['order_deadline'] ?? ''));
+    if ($value === '') {
+        return null;
+    }
+    $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $value, new DateTimeZone('Asia/Taipei'));
+    return $date ? $date->getTimestamp() : null;
 }
 
 function loadOrders(string $file): array
@@ -171,6 +198,9 @@ if (isset($_GET['download_csv'])) {
 
 $users = loadUsers($usersFile);
 $orders = loadOrders($ordersFile);
+$settings = loadSettings($settingsFile);
+$deadline = deadlineTimestamp($settings);
+$ordersClosed = $deadline !== null && time() >= $deadline;
 $message = '';
 $loginError = '';
 
@@ -199,6 +229,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['CONTENT_TYPE']) && 
     }
     $action = (string)($payload['action'] ?? '');
     $user = trim((string)($payload['user'] ?? ''));
+    if ($ordersClosed) {
+        http_response_code(423);
+        echo json_encode(['success' => false, 'error' => '訂單已截止'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if (!array_key_exists($user, $users)) {
         http_response_code(422);
         echo json_encode(['success' => false, 'error' => 'Unknown user']);
@@ -310,6 +345,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
         if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) && (int)$_FILES['menu_image']['size'] <= 10 * 1024 * 1024) {
             move_uploaded_file($tmp, $menuFile);
         }
+    } elseif ($action === 'set_deadline') {
+        $value = trim((string)($_POST['order_deadline'] ?? ''));
+        if ($value !== '') {
+            $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $value, new DateTimeZone('Asia/Taipei'));
+            if (!$date || $date->format('Y-m-d\TH:i') !== $value) {
+                http_response_code(422);
+                exit('Invalid deadline');
+            }
+        }
+        $settings['order_deadline'] = $value;
+        saveSettings($settingsFile, $settings);
+    } elseif ($action === 'set_balance') {
+        $name = trim((string)($_POST['balance_user'] ?? ''));
+        $targetBalance = filter_var($_POST['target_balance'] ?? null, FILTER_VALIDATE_INT);
+        if (array_key_exists($name, $users) && $targetBalance !== false) {
+            $pendingSpent = 0;
+            foreach ($orders as $order) {
+                if (($order['user'] ?? '') === $name) {
+                    $pendingSpent += (int)($order['price'] ?? 0);
+                }
+            }
+            $users[$name] = $targetBalance + $pendingSpent;
+            saveUsers($usersFile, $users);
+        }
+    }
+    header('Location: /');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
+    if (!csrfValid((string)($_POST['csrf'] ?? ''))) {
+        http_response_code(403);
+        exit('Invalid request');
+    }
+    if ((string)$_POST['public_action'] === 'update_group') {
+        $organizer = trim((string)($_POST['organizer'] ?? ''));
+        if (mb_strlen($organizer) > 50) {
+            http_response_code(422);
+            exit('Invalid organizer');
+        }
+        $settings['organizer'] = $organizer;
+        if (isset($_FILES['menu_image']) && $_FILES['menu_image']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $tmp = $_FILES['menu_image']['tmp_name'];
+            $mime = is_uploaded_file($tmp) ? mime_content_type($tmp) : '';
+            if (
+                !in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)
+                || (int)$_FILES['menu_image']['size'] > 10 * 1024 * 1024
+            ) {
+                http_response_code(422);
+                exit('Invalid menu image');
+            }
+            move_uploaded_file($tmp, $menuFile);
+        }
+        saveSettings($settingsFile, $settings);
     }
     header('Location: /');
     exit;
@@ -317,6 +406,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
 
 $users = loadUsers($usersFile);
 $orders = loadOrders($ordersFile);
+$settings = loadSettings($settingsFile);
+$deadline = deadlineTimestamp($settings);
+$ordersClosed = $deadline !== null && time() >= $deadline;
 $balances = $users;
 foreach ($orders as $order) {
     $name = (string)($order['user'] ?? '');
@@ -341,6 +433,8 @@ h1{color:var(--primary)}label{font-size:.8rem;color:var(--dim);font-weight:700}
 select,input,button{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;margin-top:7px}
 select,input{background:var(--bg);color:#fff}button{border:0;background:var(--primary);color:#fff;font-weight:700;cursor:pointer}
 .success{background:var(--success);color:#064e3b}.danger{background:var(--danger)}.muted{color:var(--dim)}
+.notice{border-color:var(--primary);text-align:center}.closed{border-color:var(--danger);color:#fecaca}
+button:disabled,input:disabled{opacity:.5;cursor:not-allowed}
 .menu{width:100%;border-radius:12px;display:block}.order{padding:12px 0;border-bottom:1px solid #334155}
 .actions{display:flex;gap:8px}.actions button{padding:7px}.admin{border-color:var(--success)}
 table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid #334155}
@@ -351,6 +445,24 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <div class="layout">
 <section>
 <h1>威杰智慧點餐系統</h1>
+<div class="box notice <?= $ordersClosed ? 'closed' : '' ?>">
+<?php if ($deadline !== null): ?>
+<strong><?= $ordersClosed ? '訂單已截止' : '訂單截止時間' ?></strong><br>
+<?= h(date('Y-m-d H:i', $deadline)) ?>（台北時間）
+<?php else: ?>
+<strong>目前未設定訂單截止時間</strong>
+<?php endif; ?>
+</div>
+<div class="box">
+<form method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<label>開團人</label>
+<input type="text" name="organizer" maxlength="50" value="<?= h((string)($settings['organizer'] ?? '')) ?>" placeholder="請輸入開團人姓名" required>
+<label>選擇菜單圖片（可只更新開團人）</label>
+<input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp">
+<button name="public_action" value="update_group">儲存開團資料／上傳菜單</button>
+</form>
+</div>
 <div class="box">
 <label>使用者與目前餘額</label>
 <select id="user">
@@ -362,10 +474,10 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <?php if (is_file($menuFile)): ?><div class="box"><img class="menu" src="/?menu_image=1" alt="今日菜單"></div><?php endif; ?>
 <div class="box">
 <label>新增訂單</label>
-<input id="item" maxlength="100" placeholder="品項" required>
-<input id="price" type="number" min="1" max="100000" placeholder="價格" required>
-<input id="mood" maxlength="100" placeholder="備註">
-<button class="success" onclick="createOrder()">送出訂單</button>
+<input id="item" maxlength="100" placeholder="品項" required <?= $ordersClosed ? 'disabled' : '' ?>>
+<input id="price" type="number" min="1" max="100000" placeholder="價格" required <?= $ordersClosed ? 'disabled' : '' ?>>
+<input id="mood" maxlength="100" placeholder="備註" <?= $ordersClosed ? 'disabled' : '' ?>>
+<button class="success" onclick="createOrder()" <?= $ordersClosed ? 'disabled' : '' ?>><?= $ordersClosed ? '訂單已截止' : '送出訂單' ?></button>
 </div>
 <div class="box">
 <label>所選使用者的今日訂單</label>
@@ -386,6 +498,26 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <h2>管理員</h2>
 <form method="post">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<label>訂單截止時間（台北時間）</label>
+<input type="datetime-local" name="order_deadline" value="<?= h((string)($settings['order_deadline'] ?? '')) ?>">
+<div class="actions">
+<button name="admin_action" value="set_deadline">儲存截止時間</button>
+<button class="danger" name="admin_action" value="set_deadline" onclick="this.form.order_deadline.value=''">清除截止時間</button>
+</div>
+</form>
+<form method="post">
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<label>修改個人目前餘額</label>
+<select name="balance_user" required>
+<?php foreach ($balances as $name => $balance): ?>
+<option value="<?= h($name) ?>"><?= h($name) ?>（目前 $<?= h($balance) ?>）</option>
+<?php endforeach; ?>
+</select>
+<input type="number" name="target_balance" placeholder="修改後餘額" required>
+<button name="admin_action" value="set_balance">更新個人餘額</button>
+</form>
+<form method="post">
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <input type="text" name="user_name" maxlength="50" placeholder="使用者姓名">
 <input type="number" name="initial_balance" placeholder="初始餘額" value="0">
 <div class="actions">
@@ -396,11 +528,6 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <form method="post" onsubmit="return confirm('確定結帳並歸檔今日訂單？')">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <button class="success" name="admin_action" value="settle">結帳並下載 CSV</button>
-</form>
-<form method="post" enctype="multipart/form-data">
-<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp" required>
-<button name="admin_action" value="upload_menu">更新菜單圖片</button>
 </form>
 <p><a class="muted" href="/?logout=1">登出</a></p>
 </div>
@@ -419,25 +546,30 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 </div>
 <script>
 const csrf=<?= json_encode($_SESSION['csrf']) ?>;
+const ordersClosed=<?= $ordersClosed ? 'true' : 'false' ?>;
 let orders=<?= json_encode($todayOrders, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 const userEl=document.getElementById('user');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(payload){
   const response=await fetch('/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,csrf})});
-  if(!response.ok)throw new Error('操作失敗');
-  return response.json();
+  const data=await response.json().catch(()=>({error:'操作失敗'}));
+  if(!response.ok)throw new Error(data.error||'操作失敗');
+  return data;
 }
 async function createOrder(){
+  if(ordersClosed)return alert('訂單已截止');
   const item=document.getElementById('item').value.trim(),price=Number(document.getElementById('price').value);
   if(!item||!Number.isInteger(price)||price<=0)return alert('請輸入品項與正確價格');
   await api({action:'create',user:userEl.value,item,price,mood:document.getElementById('mood').value});
   location.reload();
 }
 async function removeOrder(id){
+  if(ordersClosed)return alert('訂單已截止');
   if(!confirm('確定刪除此訂單？'))return;
   await api({action:'delete',user:userEl.value,id});location.reload();
 }
 async function editOrder(id){
+  if(ordersClosed)return alert('訂單已截止');
   const order=orders.find(o=>o.id===id);
   const item=prompt('品項',order.item);if(item===null)return;
   const price=Number(prompt('價格',order.price));if(!item.trim()||!Number.isInteger(price)||price<=0)return alert('輸入不正確');
@@ -446,7 +578,7 @@ async function editOrder(id){
 }
 function renderMine(){
   const mine=orders.filter(o=>o.user===userEl.value);
-  document.getElementById('mine').innerHTML=mine.length?mine.map(o=>`<div class="order"><b>${esc(o.item)}</b>　$${o.price}<br><small class="muted">${esc(o.mood||'無')} ${esc(o.time)}</small><div class="actions"><button onclick="editOrder('${o.id}')">修改</button><button class="danger" onclick="removeOrder('${o.id}')">刪除</button></div></div>`).join(''):'<p class="muted">目前沒有訂單</p>';
+  document.getElementById('mine').innerHTML=mine.length?mine.map(o=>`<div class="order"><b>${esc(o.item)}</b>　$${o.price}<br><small class="muted">${esc(o.mood||'無')} ${esc(o.time)}</small>${ordersClosed?'':`<div class="actions"><button onclick="editOrder('${o.id}')">修改</button><button class="danger" onclick="removeOrder('${o.id}')">刪除</button></div>`}</div>`).join(''):'<p class="muted">目前沒有訂單</p>';
 }
 userEl.addEventListener('change',renderMine);renderMine();
 </script>
