@@ -370,17 +370,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
     }
     if ((string)$_POST['public_action'] === 'update_group') {
         $organizer = trim((string)($_POST['organizer'] ?? ''));
-        if (mb_strlen($organizer) > 50) {
+        if (!array_key_exists($organizer, $users)) {
             http_response_code(422);
             exit('Invalid organizer');
         }
         $settings['organizer'] = $organizer;
-        $deadlineValue = isset($_POST['clear_deadline'])
+        $deadlineDate = trim((string)($_POST['deadline_date'] ?? ''));
+        $deadlineHour = trim((string)($_POST['deadline_hour'] ?? ''));
+        $deadlineMinute = trim((string)($_POST['deadline_minute'] ?? ''));
+        $deadlineValue = $deadlineDate === ''
             ? ''
-            : trim((string)($_POST['order_deadline'] ?? ''));
+            : $deadlineDate . 'T' . $deadlineHour . ':' . $deadlineMinute;
         if ($deadlineValue !== '') {
             $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $deadlineValue, new DateTimeZone('Asia/Taipei'));
-            if (!$date || $date->format('Y-m-d\TH:i') !== $deadlineValue) {
+            if (
+                !$date
+                || $date->format('Y-m-d\TH:i') !== $deadlineValue
+                || !preg_match('/^(?:[01]\d|2[0-3])$/', $deadlineHour)
+                || !in_array($deadlineMinute, ['00', '10', '20', '30', '40', '50'], true)
+            ) {
                 http_response_code(422);
                 exit('Invalid deadline');
             }
@@ -409,6 +417,19 @@ $orders = loadOrders($ordersFile);
 $settings = loadSettings($settingsFile);
 $deadline = deadlineTimestamp($settings);
 $ordersClosed = $deadline !== null && time() >= $deadline;
+$deadlineValue = (string)($settings['order_deadline'] ?? '');
+$selectedDeadlineDate = $deadlineValue !== '' ? substr($deadlineValue, 0, 10) : '';
+$selectedDeadlineHour = $deadlineValue !== '' ? substr($deadlineValue, 11, 2) : date('H');
+$selectedDeadlineMinute = $deadlineValue !== '' ? substr($deadlineValue, 14, 2) : '00';
+$deadlineDates = [];
+for ($dayOffset = 0; $dayOffset < 14; $dayOffset++) {
+    $dateOption = (new DateTimeImmutable('today', new DateTimeZone('Asia/Taipei')))
+        ->modify('+' . $dayOffset . ' days');
+    $deadlineDates[$dateOption->format('Y-m-d')] = $dateOption->format('m/d') . '（' . ['日', '一', '二', '三', '四', '五', '六'][(int)$dateOption->format('w')] . '）';
+}
+if ($selectedDeadlineDate !== '' && !isset($deadlineDates[$selectedDeadlineDate])) {
+    $deadlineDates = [$selectedDeadlineDate => $selectedDeadlineDate] + $deadlineDates;
+}
 $balances = $users;
 foreach ($orders as $order) {
     $name = (string)($order['user'] ?? '');
@@ -436,7 +457,7 @@ select,input{background:var(--bg);color:#fff}button{border:0;background:var(--pr
 .notice{border-color:var(--primary);text-align:center}.closed{border-color:var(--danger);color:#fecaca}
 button:disabled,input:disabled{opacity:.5;cursor:not-allowed}
 .menu{width:100%;border-radius:12px;display:block}.order{padding:12px 0;border-bottom:1px solid #334155}
-.actions{display:flex;gap:8px}.actions button{padding:7px}.admin{border-color:var(--success)}
+.actions{display:flex;gap:8px}.actions>*{flex:1;min-width:0}.actions button{padding:7px}.admin{border-color:var(--success)}
 table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid #334155}
 @media(max-width:800px){.layout{grid-template-columns:1fr}}
 </style>
@@ -457,13 +478,31 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <form method="post" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <label>開團人</label>
-<input type="text" name="organizer" maxlength="50" value="<?= h((string)($settings['organizer'] ?? '')) ?>" placeholder="請輸入開團人姓名" required>
+<select name="organizer" required>
+<option value="">請選擇開團人</option>
+<?php foreach ($users as $name => $_balance): ?>
+<option value="<?= h($name) ?>" <?= ($settings['organizer'] ?? '') === $name ? 'selected' : '' ?>><?= h($name) ?></option>
+<?php endforeach; ?>
+</select>
 <label>訂單截止時間（台北時間）</label>
-<input type="datetime-local" name="order_deadline" value="<?= h((string)($settings['order_deadline'] ?? '')) ?>">
-<label style="display:flex;align-items:center;gap:8px;margin-top:10px;text-transform:none">
-<input type="checkbox" name="clear_deadline" value="1" style="width:auto;margin:0">
-清除截止時間（不限時）
-</label>
+<div class="actions">
+<select name="deadline_date" aria-label="截止日期">
+<option value="">不限時</option>
+<?php foreach ($deadlineDates as $dateValue => $dateLabel): ?>
+<option value="<?= h($dateValue) ?>" <?= $selectedDeadlineDate === $dateValue ? 'selected' : '' ?>><?= h($dateLabel) ?></option>
+<?php endforeach; ?>
+</select>
+<select name="deadline_hour" aria-label="截止小時">
+<?php for ($hour = 0; $hour < 24; $hour++): $hourValue = str_pad((string)$hour, 2, '0', STR_PAD_LEFT); ?>
+<option value="<?= $hourValue ?>" <?= $selectedDeadlineHour === $hourValue ? 'selected' : '' ?>><?= $hourValue ?> 時</option>
+<?php endfor; ?>
+</select>
+<select name="deadline_minute" aria-label="截止分鐘">
+<?php foreach (['00', '10', '20', '30', '40', '50'] as $minuteValue): ?>
+<option value="<?= $minuteValue ?>" <?= $selectedDeadlineMinute === $minuteValue ? 'selected' : '' ?>><?= $minuteValue ?> 分</option>
+<?php endforeach; ?>
+</select>
+</div>
 <label>選擇菜單圖片（可只更新開團人）</label>
 <input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp">
 <button name="public_action" value="update_group">儲存開團人、截止時間與菜單</button>
