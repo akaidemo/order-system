@@ -1,0 +1,16 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      APP_PASSWORD: change-this-app-password
+      ADMIN_USER: admin
+      ADMIN_PASSWORD: change-this-admin-password
+      DATA_DIR: /data
+    volumes:
+      - order-data:/data
+    restart: unless-stopped
+
+volumes:
+  order-data:
