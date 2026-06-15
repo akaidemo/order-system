@@ -107,6 +107,38 @@ function saveOrders(string $file, array $orders): void
     file_put_contents($file, implode(PHP_EOL, $lines) . ($lines ? PHP_EOL : ''), LOCK_EX);
 }
 
+function settleOrders(
+    string $ordersFile,
+    string $usersFile,
+    string $historyDir,
+    array $orders,
+    array $users
+): ?string {
+    if (!$orders) {
+        return null;
+    }
+    foreach ($orders as $order) {
+        $name = (string)($order['user'] ?? '');
+        if (array_key_exists($name, $users)) {
+            $users[$name] -= (int)($order['price'] ?? 0);
+        }
+    }
+    saveUsers($usersFile, $users);
+    $timestamp = date('Ymd_His');
+    $historyFile = $historyDir . '/history_' . $timestamp . '.txt';
+    rename($ordersFile, $historyFile);
+    file_put_contents($ordersFile, '');
+    $csvName = 'report_' . $timestamp . '.csv';
+    $csv = fopen($historyDir . '/' . $csvName, 'wb');
+    fwrite($csv, "\xEF\xBB\xBF");
+    fputcsv($csv, ['日期', '時間', '使用者', '品項', '價格', '備註']);
+    foreach ($orders as $order) {
+        fputcsv($csv, [$order['date'], $order['time'], $order['user'], $order['item'], $order['price'], $order['mood'] ?? '無']);
+    }
+    fclose($csv);
+    return $csvName;
+}
+
 function requireAdmin(): void
 {
     if (empty($_SESSION['is_admin'])) {
@@ -183,13 +215,15 @@ if (isset($_GET['menu_image'])) {
 }
 
 if (isset($_GET['download_csv'])) {
-    requireAdmin();
     $file = basename((string)$_GET['download_csv']);
     $path = $historyDir . '/' . $file;
-    if (!preg_match('/^report_\d{8}_\d{6}\.csv$/', $file) || !is_file($path)) {
+    $authorized = !empty($_SESSION['is_admin'])
+        || (!empty($_SESSION['download_csv_once']) && hash_equals((string)$_SESSION['download_csv_once'], $file));
+    if (!$authorized || !preg_match('/^report_\d{8}_\d{6}\.csv$/', $file) || !is_file($path)) {
         http_response_code(404);
         exit;
     }
+    unset($_SESSION['download_csv_once']);
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $file . '"');
     readfile($path);
@@ -315,30 +349,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
             unset($users[$name]);
             saveUsers($usersFile, $users);
         }
-    } elseif ($action === 'settle') {
-        foreach ($orders as $order) {
-            $name = (string)($order['user'] ?? '');
-            if (array_key_exists($name, $users)) {
-                $users[$name] -= (int)($order['price'] ?? 0);
-            }
-        }
-        saveUsers($usersFile, $users);
-        if ($orders) {
-            $timestamp = date('Ymd_His');
-            $historyFile = $historyDir . '/history_' . $timestamp . '.txt';
-            rename($ordersFile, $historyFile);
-            file_put_contents($ordersFile, '');
-            $csvName = 'report_' . $timestamp . '.csv';
-            $csv = fopen($historyDir . '/' . $csvName, 'wb');
-            fwrite($csv, "\xEF\xBB\xBF");
-            fputcsv($csv, ['日期', '時間', '使用者', '品項', '價格', '備註']);
-            foreach ($orders as $order) {
-                fputcsv($csv, [$order['date'], $order['time'], $order['user'], $order['item'], $order['price'], $order['mood'] ?? '無']);
-            }
-            fclose($csv);
-            header('Location: /?download_csv=' . rawurlencode($csvName));
-            exit;
-        }
     } elseif ($action === 'upload_menu' && isset($_FILES['menu_image'])) {
         $tmp = $_FILES['menu_image']['tmp_name'];
         $mime = is_uploaded_file($tmp) ? mime_content_type($tmp) : '';
@@ -368,7 +378,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
         http_response_code(403);
         exit('Invalid request');
     }
-    if ((string)$_POST['public_action'] === 'update_group') {
+    $publicAction = (string)$_POST['public_action'];
+    if ($publicAction === 'settle_group') {
+        $organizer = (string)($settings['organizer'] ?? '');
+        if ($organizer === '' || !array_key_exists($organizer, $users)) {
+            http_response_code(422);
+            exit('請先設定有效的開團人');
+        }
+        $csvName = settleOrders($ordersFile, $usersFile, $historyDir, $orders, $users);
+        if ($csvName === null) {
+            header('Location: /');
+            exit;
+        }
+        $_SESSION['download_csv_once'] = $csvName;
+        header('Location: /?download_csv=' . rawurlencode($csvName));
+        exit;
+    }
+    if ($publicAction === 'update_group') {
         $organizer = trim((string)($_POST['organizer'] ?? ''));
         if (!array_key_exists($organizer, $users)) {
             http_response_code(422);
@@ -507,6 +533,10 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp">
 <button name="public_action" value="update_group">儲存開團人、截止時間與菜單</button>
 </form>
+<form method="post" onsubmit="return confirm('確定結單？這會扣除本團消費、歸檔所有訂單，並下載 CSV 到這台電腦。')">
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<button class="success" name="public_action" value="settle_group" <?= $orders ? '' : 'disabled' ?>>結單並下載 CSV</button>
+</form>
 </div>
 <div class="box">
 <label>使用者與目前餘額</label>
@@ -560,10 +590,6 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <button name="admin_action" value="add_user">新增</button>
 <button class="danger" name="admin_action" value="delete_user">刪除</button>
 </div>
-</form>
-<form method="post" onsubmit="return confirm('確定結帳並歸檔今日訂單？')">
-<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<button class="success" name="admin_action" value="settle">結帳並下載 CSV</button>
 </form>
 <p><a class="muted" href="/?logout=1">登出</a></p>
 </div>
