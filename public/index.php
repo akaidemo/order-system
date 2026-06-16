@@ -16,6 +16,7 @@ $menuFile = $dataDir . '/menu';
 $settingsFile = $dataDir . '/settings.json';
 $menuLibraryDir = $dataDir . '/menu_library';
 $menuLibraryFile = $dataDir . '/menu_library.json';
+$balanceAuditFile = $dataDir . '/balance_audit.jsonl';
 $appPassword = getenv('APP_PASSWORD') ?: '';
 $adminUser = getenv('ADMIN_USER') ?: 'admin';
 $adminPassword = getenv('ADMIN_PASSWORD') ?: '';
@@ -31,6 +32,9 @@ if (!is_file($ordersFile)) {
 }
 if (!is_file($usersFile)) {
     file_put_contents($usersFile, json_encode(['管理員' => 0], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+}
+if (!is_file($balanceAuditFile)) {
+    file_put_contents($balanceAuditFile, '');
 }
 if (empty($_SESSION['csrf'])) {
     $_SESSION['csrf'] = bin2hex(random_bytes(24));
@@ -57,6 +61,32 @@ function saveUsers(string $file, array $users): void
     $tmp = $file . '.tmp';
     file_put_contents($tmp, json_encode($users, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
     rename($tmp, $file);
+}
+
+function appendBalanceAudit(string $file, array $entry): void
+{
+    $entry = [
+        'time' => date('Y-m-d H:i:s'),
+        'actor' => !empty($_SESSION['is_admin']) ? 'admin' : 'system',
+    ] + $entry;
+    file_put_contents($file, json_encode($entry, JSON_UNESCAPED_UNICODE) . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
+function loadBalanceAudit(string $file, int $limit = 50): array
+{
+    if (!is_file($file)) {
+        return [];
+    }
+    $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+    $lines = array_slice($lines, -$limit);
+    $items = [];
+    foreach (array_reverse($lines) as $line) {
+        $item = json_decode($line, true);
+        if (is_array($item)) {
+            $items[] = $item;
+        }
+    }
+    return $items;
 }
 
 function loadSettings(string $file): array
@@ -150,17 +180,32 @@ function settleOrders(
     string $ordersFile,
     string $usersFile,
     string $historyDir,
+    string $balanceAuditFile,
     array $orders,
     array $users
 ): ?string {
     if (!$orders) {
         return null;
     }
+    $spentByUser = [];
     foreach ($orders as $order) {
         $name = (string)($order['user'] ?? '');
         if (array_key_exists($name, $users)) {
-            $users[$name] -= (int)($order['price'] ?? 0);
+            $spentByUser[$name] = ($spentByUser[$name] ?? 0) + (int)($order['price'] ?? 0);
         }
+    }
+    foreach ($spentByUser as $name => $spent) {
+        $before = (int)$users[$name];
+        $after = $before - $spent;
+        $users[$name] = $after;
+        appendBalanceAudit($balanceAuditFile, [
+            'action' => 'settle_order',
+            'user' => $name,
+            'before_balance' => $before,
+            'after_balance' => $after,
+            'amount' => -$spent,
+            'note' => '結單扣款',
+        ]);
     }
     saveUsers($usersFile, $users);
     $timestamp = date('Ymd_His');
@@ -380,14 +425,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
     if ($action === 'add_user') {
         $name = trim((string)($_POST['user_name'] ?? ''));
         if ($name !== '' && mb_strlen($name) <= 50 && !array_key_exists($name, $users)) {
-            $users[$name] = (int)($_POST['initial_balance'] ?? 0);
+            $initialBalance = (int)($_POST['initial_balance'] ?? 0);
+            $users[$name] = $initialBalance;
             saveUsers($usersFile, $users);
+            appendBalanceAudit($balanceAuditFile, [
+                'action' => 'add_user',
+                'user' => $name,
+                'before_balance' => null,
+                'after_balance' => $initialBalance,
+                'amount' => $initialBalance,
+                'note' => '新增人員',
+            ]);
         }
     } elseif ($action === 'delete_user') {
         $name = trim((string)($_POST['user_name'] ?? ''));
-        if ($name !== '管理員') {
+        if ($name !== '管理員' && array_key_exists($name, $users)) {
+            $beforeBalance = (int)$users[$name];
             unset($users[$name]);
             saveUsers($usersFile, $users);
+            appendBalanceAudit($balanceAuditFile, [
+                'action' => 'delete_user',
+                'user' => $name,
+                'before_balance' => $beforeBalance,
+                'after_balance' => null,
+                'amount' => -$beforeBalance,
+                'note' => '刪除人員',
+            ]);
         }
     } elseif ($action === 'upload_menu' && isset($_FILES['menu_image'])) {
         $tmp = $_FILES['menu_image']['tmp_name'];
@@ -405,8 +468,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
                     $pendingSpent += (int)($order['price'] ?? 0);
                 }
             }
+            $beforeStored = (int)$users[$name];
+            $beforeVisible = $beforeStored - $pendingSpent;
+            $afterStored = $targetBalance + $pendingSpent;
             $users[$name] = $targetBalance + $pendingSpent;
             saveUsers($usersFile, $users);
+            appendBalanceAudit($balanceAuditFile, [
+                'action' => 'manual_adjust',
+                'user' => $name,
+                'before_balance' => $beforeVisible,
+                'after_balance' => $targetBalance,
+                'amount' => $targetBalance - $beforeVisible,
+                'pending_spent' => $pendingSpent,
+                'before_stored_balance' => $beforeStored,
+                'after_stored_balance' => $afterStored,
+                'note' => trim((string)($_POST['balance_note'] ?? '')),
+            ]);
         }
     }
     header('Location: /');
@@ -435,7 +512,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
             http_response_code(422);
             exit('請先設定有效的開團人');
         }
-        $csvName = settleOrders($ordersFile, $usersFile, $historyDir, $orders, $users);
+        $csvName = settleOrders($ordersFile, $usersFile, $historyDir, $balanceAuditFile, $orders, $users);
         if ($csvName === null) {
             header('Location: /');
             exit;
@@ -514,6 +591,7 @@ $users = loadUsers($usersFile);
 $orders = loadOrders($ordersFile);
 $settings = loadSettings($settingsFile);
 $menuLibrary = loadMenuLibrary($menuLibraryFile);
+$balanceAudit = loadBalanceAudit($balanceAuditFile, 50);
 $deadline = deadlineTimestamp($settings);
 $ordersClosed = $deadline !== null && time() >= $deadline;
 $deadlineValue = (string)($settings['order_deadline'] ?? '');
@@ -720,6 +798,7 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <?php endforeach; ?>
 </select>
 <input type="number" name="target_balance" placeholder="修改後餘額" required>
+<input type="text" name="balance_note" maxlength="120" placeholder="調整原因（例如：儲值、補扣、修正）">
 <button name="admin_action" value="set_balance">更新個人餘額</button>
 </form>
 <form method="post">
@@ -731,6 +810,40 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <button class="danger" name="admin_action" value="delete_user">刪除</button>
 </div>
 </form>
+<h3>金額修改紀錄</h3>
+<?php if ($balanceAudit): ?>
+<table>
+<thead><tr><th>時間 / 人員</th><th>異動</th><th>原因</th></tr></thead>
+<tbody>
+<?php foreach ($balanceAudit as $audit): ?>
+<?php
+$beforeAudit = $audit['before_balance'] ?? null;
+$afterAudit = $audit['after_balance'] ?? null;
+$amountAudit = (int)($audit['amount'] ?? 0);
+$actionLabels = [
+    'manual_adjust' => '手動調整',
+    'settle_order' => '結單扣款',
+    'add_user' => '新增人員',
+    'delete_user' => '刪除人員',
+];
+?>
+<tr>
+<td><small class="muted"><?= h($audit['time'] ?? '') ?></small><br><?= h($audit['user'] ?? '') ?></td>
+<td>
+<?= h($actionLabels[$audit['action'] ?? ''] ?? ($audit['action'] ?? '異動')) ?><br>
+<small class="muted">
+<?= $beforeAudit === null ? '無' : '$' . h($beforeAudit) ?> → <?= $afterAudit === null ? '無' : '$' . h($afterAudit) ?>
+（<?= $amountAudit >= 0 ? '+' : '' ?><?= h($amountAudit) ?>）
+</small>
+</td>
+<td><?= h(($audit['note'] ?? '') !== '' ? $audit['note'] : '無') ?></td>
+</tr>
+<?php endforeach; ?>
+</tbody>
+</table>
+<?php else: ?>
+<p class="muted">尚無金額修改紀錄。</p>
+<?php endif; ?>
 <p><a class="muted" href="/?logout=1">登出</a></p>
 </div>
 <?php else: ?>
