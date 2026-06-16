@@ -214,7 +214,7 @@ if (empty($_SESSION['app_authenticated'])) {
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>威杰智慧點餐系統</title>
+        <title>威杰飲料管理系統</title>
         <style>
             body{margin:0;background:#0f172a;color:#f8fafc;font-family:system-ui;display:grid;place-items:center;min-height:100vh}
             form{width:min(360px,calc(100% - 48px));background:#1e293b;padding:28px;border-radius:18px}
@@ -225,8 +225,8 @@ if (empty($_SESSION['app_authenticated'])) {
     </head>
     <body>
     <form method="post">
-        <h1>威杰智慧點餐系統</h1>
-        <p>請輸入公司共用密碼。</p>
+        <h1>威杰飲料管理系統</h1>
+        <p>請輸入公司共用密碼，準備開喝。</p>
         <?php if ($authError): ?><p class="error"><?= h($authError) ?></p><?php endif; ?>
         <input type="password" name="password" autocomplete="current-password" required autofocus>
         <button name="app_login" value="1">進入系統</button>
@@ -543,28 +543,57 @@ $todayOrders = array_values(array_filter($orders, static fn(array $order): bool 
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>威杰智慧點餐系統</title>
+<title>威杰飲料管理系統</title>
 <style>
-:root{--primary:#818cf8;--success:#34d399;--bg:#0f172a;--card:#1e293b;--text:#f8fafc;--dim:#94a3b8;--danger:#f87171}
-*{box-sizing:border-box}body{font-family:system-ui;background:var(--bg);color:var(--text);margin:0;padding:20px}
-.layout{display:grid;grid-template-columns:minmax(300px,1fr) minmax(320px,1fr);max-width:1200px;margin:auto;gap:20px}
-.box{background:var(--card);padding:18px;border-radius:16px;margin-bottom:15px;border:1px solid #334155}
-h1{color:var(--primary)}label{font-size:.8rem;color:var(--dim);font-weight:700}
-select,input,button{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;margin-top:7px}
-select,input{background:var(--bg);color:#fff}button{border:0;background:var(--primary);color:#fff;font-weight:700;cursor:pointer}
-.success{background:var(--success);color:#064e3b}.danger{background:var(--danger)}.muted{color:var(--dim)}
-.notice{border-color:var(--primary);text-align:center}.closed{border-color:var(--danger);color:#fecaca}
-button:disabled,input:disabled{opacity:.5;cursor:not-allowed}
-.menu{width:100%;border-radius:12px;display:block}.order{padding:12px 0;border-bottom:1px solid #334155}
-.actions{display:flex;gap:8px}.actions>*{flex:1;min-width:0}.actions button{padding:7px}.admin{border-color:var(--success)}
-table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid #334155}
-@media(max-width:800px){.layout{grid-template-columns:1fr}}
+:root{--primary:#f97316;--primary-soft:#fed7aa;--success:#22c55e;--bg:#fff7ed;--panel:#ffffff;--panel-strong:#ffedd5;--text:#1f2937;--dim:#6b7280;--line:#fdba74;--danger:#ef4444;--shadow:0 18px 45px rgba(154,52,18,.14)}
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:radial-gradient(circle at 12% 8%,rgba(253,186,116,.55) 0 120px,transparent 121px),radial-gradient(circle at 88% 16%,rgba(120,53,15,.14) 0 90px,transparent 91px),linear-gradient(135deg,#fff7ed 0,#fef3c7 45%,#f8fafc 100%);color:var(--text);margin:0;padding:24px;position:relative;overflow-x:hidden}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.28;background:
+radial-gradient(circle at 8% 88%,#78350f 0 6px,transparent 7px),
+radial-gradient(circle at 13% 84%,#78350f 0 5px,transparent 6px),
+radial-gradient(circle at 18% 90%,#78350f 0 7px,transparent 8px),
+radial-gradient(ellipse at 78% 84%,#65a30d 0 10px,transparent 11px),
+radial-gradient(ellipse at 83% 80%,#84cc16 0 13px,transparent 14px),
+radial-gradient(ellipse at 90% 87%,#4d7c0f 0 10px,transparent 11px)}
+.app-shell{max-width:1280px;margin:0 auto}
+.hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:20px;padding:22px;border-radius:28px;background:linear-gradient(135deg,#9a3412,#f97316);color:white;box-shadow:var(--shadow)}
+.hero h1{margin:0;font-size:2rem;letter-spacing:.03em}.hero p{margin:.4rem 0 0;color:#ffedd5}.status-strip{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:9px 13px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);font-size:.9rem;font-weight:700}
+.layout{display:grid;grid-template-columns:minmax(360px,1.15fr) minmax(360px,.85fr);gap:20px;align-items:start}
+.box{background:rgba(255,255,255,.92);padding:18px;border-radius:24px;margin-bottom:16px;border:1px solid #fed7aa;box-shadow:var(--shadow)}
+.box h2{margin:0 0 12px;font-size:1.1rem;color:#9a3412}.section-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+label{display:block;font-size:.78rem;color:var(--dim);font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-top:10px}
+select,input,button{width:100%;padding:13px 14px;border-radius:14px;border:1px solid #fdba74;margin-top:7px;font-size:1rem}
+select,input{background:#fffaf5;color:var(--text)}button{border:0;background:var(--primary);color:white;font-weight:800;cursor:pointer;box-shadow:0 10px 20px rgba(249,115,22,.24);border-radius:999px}
+button:hover{filter:brightness(.98);transform:translateY(-1px)}.success{background:var(--success);color:white}.danger{background:var(--danger)}.muted{color:var(--dim)}
+.danger{border-radius:10px 18px 10px 18px}.success{border-radius:18px;box-shadow:0 6px 0 #15803d,0 14px 24px rgba(34,197,94,.22)}
+.actions .danger{border-radius:8px 16px 8px 16px}.actions button:not(.danger){border-radius:999px}
+.notice{background:var(--panel-strong);border-color:var(--primary);text-align:center;font-weight:700}.closed{border-color:var(--danger);color:#991b1b;background:#fee2e2}
+button:disabled,input:disabled{opacity:.5;cursor:not-allowed;transform:none}.menu{width:100%;border-radius:20px;display:block;border:1px solid #fed7aa}
+.menu-card{overflow:hidden;padding:10px}.order{padding:13px;border:1px solid #ffedd5;border-radius:16px;margin-top:10px;background:#fffaf5}
+.actions{display:flex;gap:8px}.actions>*{flex:1;min-width:0}.actions button{padding:9px}.admin{border-color:#86efac}
+.order-form{display:grid;grid-template-columns:1.2fr .6fr;gap:10px}.order-form .wide{grid-column:1/-1}
+table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:left;padding:10px;background:#fffaf5}th{color:var(--dim);font-size:.78rem;text-transform:uppercase}td:first-child,th:first-child{border-radius:12px 0 0 12px}td:last-child,th:last-child{border-radius:0 12px 12px 0}
+.sidebar{position:sticky;top:20px}.total-badge{white-space:nowrap;color:#9a3412;background:#ffedd5;border-radius:999px;padding:6px 10px;font-weight:800}
+.bubble-bg{position:absolute;right:18px;bottom:12px;color:rgba(120,53,15,.16);font-size:3rem;line-height:1;pointer-events:none}
+@media(max-width:900px){body{padding:14px}.hero{display:block}.status-strip{justify-content:flex-start;margin-top:14px}.layout{grid-template-columns:1fr}.sidebar{position:static}.order-form{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<div class="app-shell">
+<header class="hero">
+<div>
+<h1>威杰飲料管理系統</h1>
+<p>開團、看菜單、填訂單、結單下載，今天喝什麼一頁搞定。</p>
+</div>
+<div class="status-strip">
+<span class="pill">開團人：<?= h((string)($settings['organizer'] ?? '尚未設定')) ?></span>
+<span class="pill"><?= count($todayOrders) ?> 筆訂單</span>
+<span class="pill">$<?= h(array_sum(array_map(static fn(array $order): int => (int)($order['price'] ?? 0), $todayOrders))) ?></span>
+</div>
+</header>
 <div class="layout">
 <section>
-<h1>威杰智慧點餐系統</h1>
 <div class="box notice <?= $ordersClosed ? 'closed' : '' ?>">
 <?php if ($deadline !== null): ?>
 <strong><?= $ordersClosed ? '訂單已截止' : '訂單截止時間' ?></strong><br>
@@ -574,6 +603,7 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <?php endif; ?>
 </div>
 <div class="box">
+<h2>開團設定</h2>
 <form method="post" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <label>開團人</label>
@@ -607,6 +637,7 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 </div>
 <div class="box">
 <h2>菜單管理</h2>
+<span class="bubble-bg">● ● ●</span>
 <form method="post" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <?php if ($menuLibrary): ?>
@@ -638,12 +669,14 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <?php endif; ?>
 </div>
 <div class="box">
+<h2>結單下載</h2>
 <form method="post" onsubmit="return confirm('確定結單？這會扣除本團消費、歸檔所有訂單，並下載 CSV 到這台電腦。')">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <button class="success" name="public_action" value="settle_group" <?= $orders ? '' : 'disabled' ?>>結單並下載 CSV</button>
 </form>
 </div>
 <div class="box">
+<h2>我要點餐</h2>
 <label>使用者與目前餘額</label>
 <select id="user">
 <?php foreach ($balances as $name => $balance): ?>
@@ -651,22 +684,24 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 <?php endforeach; ?>
 </select>
 </div>
-<?php if (is_file($menuFile)): ?><div class="box"><img class="menu" src="/?menu_image=1" alt="今日菜單"></div><?php endif; ?>
+<?php if (is_file($menuFile)): ?><div class="box menu-card"><div class="section-title"><h2>今日菜單</h2><span class="total-badge">點圖放大查看</span></div><img class="menu" src="/?menu_image=1" alt="今日菜單"></div><?php endif; ?>
 <div class="box">
-<label>新增訂單</label>
-<input id="item" maxlength="100" placeholder="品項" required <?= $ordersClosed ? 'disabled' : '' ?>>
+<div class="section-title"><h2>新增訂單</h2><span class="total-badge"><?= $ordersClosed ? '已截止' : '開放中' ?></span></div>
+<div class="order-form">
+<input id="item" maxlength="100" placeholder="品項，例如：珍珠奶茶 微糖少冰" required <?= $ordersClosed ? 'disabled' : '' ?>>
 <input id="price" type="number" min="1" max="100000" placeholder="價格" required <?= $ordersClosed ? 'disabled' : '' ?>>
-<input id="mood" maxlength="100" placeholder="備註" <?= $ordersClosed ? 'disabled' : '' ?>>
+<input class="wide" id="mood" maxlength="100" placeholder="備註，例如：去冰、不要香菜、加珍珠" <?= $ordersClosed ? 'disabled' : '' ?>>
+</div>
 <button class="success" onclick="createOrder()" <?= $ordersClosed ? 'disabled' : '' ?>><?= $ordersClosed ? '訂單已截止' : '送出訂單' ?></button>
 </div>
 <div class="box">
-<label>所選使用者的今日訂單</label>
+<div class="section-title"><h2>我的今日訂單</h2><span class="total-badge">可修改 / 刪除</span></div>
 <div id="mine"></div>
 </div>
 </section>
-<aside>
+<aside class="sidebar">
 <div class="box">
-<label>今日訂單（<?= count($todayOrders) ?> 筆）</label>
+<div class="section-title"><h2>今日訂單</h2><span class="total-badge"><?= count($todayOrders) ?> 筆</span></div>
 <table><thead><tr><th>姓名 / 品項</th><th>價格</th><th>備註</th></tr></thead><tbody>
 <?php foreach (array_reverse($todayOrders) as $order): ?>
 <tr><td><small class="muted"><?= h($order['user']) ?></small><br><?= h($order['item']) ?></td><td>$<?= h($order['price']) ?></td><td><?= h($order['mood'] ?? '無') ?></td></tr>
@@ -710,6 +745,7 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;bord
 </div>
 <?php endif; ?>
 </aside>
+</div>
 </div>
 <script>
 const csrf=<?= json_encode($_SESSION['csrf']) ?>;
