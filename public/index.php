@@ -215,7 +215,7 @@ function settleOrders(
     $csvName = 'report_' . $timestamp . '.csv';
     $csv = fopen($historyDir . '/' . $csvName, 'wb');
     fwrite($csv, "\xEF\xBB\xBF");
-    fputcsv($csv, ['日期', '時間', '使用者', '品項', '價格', '備註']);
+    fputcsv($csv, ['日期', '時間', '使用者', '品項', '價格', '今日心情']);
     foreach ($orders as $order) {
         fputcsv($csv, [$order['date'], $order['time'], $order['user'], $order['item'], $order['price'], $order['mood'] ?? '無']);
     }
@@ -768,7 +768,7 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <div class="order-form">
 <input id="item" maxlength="100" placeholder="品項，例如：珍珠奶茶 微糖少冰" required <?= $ordersClosed ? 'disabled' : '' ?>>
 <input id="price" type="number" min="1" max="100000" placeholder="價格" required <?= $ordersClosed ? 'disabled' : '' ?>>
-<input class="wide" id="mood" maxlength="100" placeholder="備註，例如：去冰、不要香菜、加珍珠" <?= $ordersClosed ? 'disabled' : '' ?>>
+<input class="wide" id="mood" maxlength="100" placeholder="今日心情，例如：今天想喝甜一點、去冰、加珍珠" <?= $ordersClosed ? 'disabled' : '' ?>>
 </div>
 <button class="success" onclick="createOrder()" <?= $ordersClosed ? 'disabled' : '' ?>><?= $ordersClosed ? '訂單已截止' : '送出訂單' ?></button>
 </div>
@@ -780,7 +780,7 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <aside class="sidebar">
 <div class="box">
 <div class="section-title"><h2>今日訂單</h2><span class="total-badge"><?= count($todayOrders) ?> 筆</span></div>
-<table><thead><tr><th>姓名 / 品項</th><th>價格</th><th>備註</th></tr></thead><tbody>
+<table><thead><tr><th>姓名 / 品項</th><th>價格</th><th>今日心情</th></tr></thead><tbody>
 <?php foreach (array_reverse($todayOrders) as $order): ?>
 <tr><td><small class="muted"><?= h($order['user']) ?></small><br><?= h($order['item']) ?></td><td>$<?= h($order['price']) ?></td><td><?= h($order['mood'] ?? '無') ?></td></tr>
 <?php endforeach; ?>
@@ -889,7 +889,7 @@ async function editOrder(id){
   const order=orders.find(o=>o.id===id);
   const item=prompt('品項',order.item);if(item===null)return;
   const price=Number(prompt('價格',order.price));if(!item.trim()||!Number.isInteger(price)||price<=0)return alert('輸入不正確');
-  const mood=prompt('備註',order.mood||'無');if(mood===null)return;
+  const mood=prompt('今日心情',order.mood||'無');if(mood===null)return;
   await api({action:'edit',user:userEl.value,id,item:item.trim(),price,mood});location.reload();
 }
 function renderMine(){
