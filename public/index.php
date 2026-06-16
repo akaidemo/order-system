@@ -91,11 +91,18 @@ function loadBalanceAudit(string $file, int $limit = 50): array
 
 function loadSettings(string $file): array
 {
+    $defaults = [
+        'order_deadline' => '',
+        'organizer' => '',
+        'group_count' => 0,
+        'active_group_started' => false,
+        'group_started_at' => '',
+    ];
     if (!is_file($file)) {
-        return ['order_deadline' => '', 'organizer' => ''];
+        return $defaults;
     }
     $settings = json_decode((string)file_get_contents($file), true);
-    return is_array($settings) ? $settings : ['order_deadline' => '', 'organizer' => ''];
+    return is_array($settings) ? $settings + $defaults : $defaults;
 }
 
 function saveSettings(string $file, array $settings): void
@@ -517,6 +524,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
             header('Location: /');
             exit;
         }
+        $settings['active_group_started'] = false;
+        $settings['group_started_at'] = '';
+        saveSettings($settingsFile, $settings);
         $_SESSION['download_csv_once'] = $csvName;
         header('Location: /?download_csv=' . rawurlencode($csvName));
         exit;
@@ -526,6 +536,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
         if (!array_key_exists($organizer, $users)) {
             http_response_code(422);
             exit('Invalid organizer');
+        }
+        if (empty($settings['active_group_started']) && !$orders) {
+            $settings['group_count'] = max(0, (int)($settings['group_count'] ?? 0)) + 1;
+            $settings['active_group_started'] = true;
+            $settings['group_started_at'] = date('Y-m-d H:i:s');
         }
         $settings['organizer'] = $organizer;
         $deadlineDate = trim((string)($_POST['deadline_date'] ?? ''));
@@ -666,6 +681,7 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 </div>
 <div class="status-strip">
 <span class="pill">開團人：<?= h((string)($settings['organizer'] ?? '尚未設定')) ?></span>
+<span class="pill">累計開團 <?= h((int)($settings['group_count'] ?? 0)) ?> 次</span>
 <span class="pill"><?= count($todayOrders) ?> 筆訂單</span>
 <span class="pill">$<?= h(array_sum(array_map(static fn(array $order): int => (int)($order['price'] ?? 0), $todayOrders))) ?></span>
 </div>
