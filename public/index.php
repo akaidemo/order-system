@@ -669,6 +669,10 @@ button:disabled,input:disabled{opacity:.5;cursor:not-allowed;transform:none}.men
 table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:left;padding:10px;background:#fffaf5}th{color:var(--dim);font-size:.78rem;text-transform:uppercase}td:first-child,th:first-child{border-radius:12px 0 0 12px}td:last-child,th:last-child{border-radius:0 12px 12px 0}
 .sidebar{position:sticky;top:20px}.total-badge{white-space:nowrap;color:#9a3412;background:#ffedd5;border-radius:999px;padding:6px 10px;font-weight:800}
 .bubble-bg{position:absolute;right:18px;bottom:12px;color:rgba(120,53,15,.16);font-size:3rem;line-height:1;pointer-events:none}
+.order-dialog{width:min(440px,calc(100% - 32px));padding:0;border:0;border-radius:24px;background:#fffaf5;color:var(--text);box-shadow:0 28px 80px rgba(120,53,15,.35)}
+.order-dialog::backdrop{background:rgba(67,34,15,.58);backdrop-filter:blur(3px)}
+.order-dialog-card{padding:24px}.order-dialog h2{margin:0;color:#9a3412}.order-dialog p{margin:8px 0 14px;color:var(--dim)}
+.order-dialog .actions{margin-top:18px}.order-dialog .actions button{margin-top:0}.secondary{background:#fff;color:#9a3412;border:1px solid #fdba74;box-shadow:none}
 @media(max-width:900px){body{padding:14px}.hero{display:block}.status-strip{justify-content:flex-start;margin-top:14px}.layout{grid-template-columns:1fr}.sidebar{position:static}.order-form{grid-template-columns:1fr}}
 </style>
 </head>
@@ -876,11 +880,30 @@ $actionLabels = [
 </aside>
 </div>
 </div>
+<dialog id="orderUserDialog" class="order-dialog">
+<div class="order-dialog-card">
+<h2>請確認下單人</h2>
+<p>最後一步，請選擇這杯飲料是誰訂的。</p>
+<label for="orderUser">本次下單人</label>
+<select id="orderUser" required>
+<option value="">請選擇人員</option>
+<?php foreach ($balances as $name => $balance): ?>
+<option value="<?= h($name) ?>"><?= h($name) ?>（$<?= h($balance) ?>）</option>
+<?php endforeach; ?>
+</select>
+<div class="actions">
+<button type="button" class="secondary" onclick="closeOrderUserDialog()">返回修改</button>
+<button type="button" class="success" onclick="confirmOrderUser()">確認送出</button>
+</div>
+</div>
+</dialog>
 <script>
 const csrf=<?= json_encode($_SESSION['csrf']) ?>;
 const ordersClosed=<?= $ordersClosed ? 'true' : 'false' ?>;
 let orders=<?= json_encode($todayOrders, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 const userEl=document.getElementById('user');
+const orderUserDialog=document.getElementById('orderUserDialog');
+const orderUserEl=document.getElementById('orderUser');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(payload){
   const response=await fetch('/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,csrf})});
@@ -892,7 +915,23 @@ async function createOrder(){
   if(ordersClosed)return alert('訂單已截止');
   const item=document.getElementById('item').value.trim(),price=Number(document.getElementById('price').value);
   if(!item||!Number.isInteger(price)||price<=0)return alert('請輸入品項與正確價格');
-  await api({action:'create',user:userEl.value,item,price,mood:document.getElementById('mood').value});
+  orderUserEl.value='';
+  orderUserDialog.showModal();
+  orderUserEl.focus();
+}
+function closeOrderUserDialog(){
+  orderUserDialog.close();
+}
+async function confirmOrderUser(){
+  const user=orderUserEl.value;
+  if(!user)return alert('請先選擇下單人');
+  const item=document.getElementById('item').value.trim(),price=Number(document.getElementById('price').value);
+  if(!item||!Number.isInteger(price)||price<=0){
+    orderUserDialog.close();
+    return alert('請輸入品項與正確價格');
+  }
+  userEl.value=user;
+  await api({action:'create',user,item,price,mood:document.getElementById('mood').value});
   location.reload();
 }
 async function removeOrder(id){
