@@ -174,6 +174,32 @@ function loadOrders(string $file): array
     return $orders;
 }
 
+function orderWeekStart(string $date): ?string
+{
+    $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date, new DateTimeZone('Asia/Taipei'));
+    if (!$parsed || $parsed->format('Y-m-d') !== $date) {
+        return null;
+    }
+    return $parsed->modify('monday this week')->format('Y-m-d');
+}
+
+function loadArchivedOrders(string $historyDir): array
+{
+    $items = [];
+    foreach (glob($historyDir . '/history_*.txt') ?: [] as $file) {
+        if (!preg_match('/history_(\d{8}_\d{6})\.txt$/', basename($file), $match)) {
+            continue;
+        }
+        $settledAt = DateTimeImmutable::createFromFormat('!Ymd_His', $match[1], new DateTimeZone('Asia/Taipei'));
+        foreach (loadOrders($file) as $order) {
+            $order['history_status'] = '已結單';
+            $order['settled_at'] = $settledAt ? $settledAt->format('Y-m-d H:i:s') : '';
+            $items[] = $order;
+        }
+    }
+    return $items;
+}
+
 function saveOrders(string $file, array $orders): void
 {
     $lines = array_map(
@@ -607,6 +633,46 @@ $orders = loadOrders($ordersFile);
 $settings = loadSettings($settingsFile);
 $menuLibrary = loadMenuLibrary($menuLibraryFile);
 $balanceAudit = loadBalanceAudit($balanceAuditFile, 50);
+$weeklyHistory = [];
+$selectedHistoryWeek = '';
+$selectedWeekOrders = [];
+$selectedWeekUserTotals = [];
+if (!empty($_SESSION['is_admin'])) {
+    $historyOrders = array_merge(loadArchivedOrders($historyDir), array_map(
+        static function (array $order): array {
+            $order['history_status'] = '未結單';
+            $order['settled_at'] = '';
+            return $order;
+        },
+        $orders
+    ));
+    foreach ($historyOrders as $order) {
+        $weekStart = orderWeekStart((string)($order['date'] ?? ''));
+        if ($weekStart !== null) {
+            $weeklyHistory[$weekStart][] = $order;
+        }
+    }
+    krsort($weeklyHistory);
+    $requestedWeek = trim((string)($_GET['history_week'] ?? ''));
+    $currentWeek = orderWeekStart(date('Y-m-d')) ?? '';
+    $selectedHistoryWeek = isset($weeklyHistory[$requestedWeek])
+        ? $requestedWeek
+        : (isset($weeklyHistory[$currentWeek]) ? $currentWeek : (string)(array_key_first($weeklyHistory) ?? ''));
+    $selectedWeekOrders = $selectedHistoryWeek !== '' ? $weeklyHistory[$selectedHistoryWeek] : [];
+    usort($selectedWeekOrders, static fn(array $a, array $b): int => strcmp(
+        (string)($b['date'] ?? '') . ' ' . (string)($b['time'] ?? ''),
+        (string)($a['date'] ?? '') . ' ' . (string)($a['time'] ?? '')
+    ));
+    foreach ($selectedWeekOrders as $order) {
+        $name = (string)($order['user'] ?? '未知');
+        if (!isset($selectedWeekUserTotals[$name])) {
+            $selectedWeekUserTotals[$name] = ['count' => 0, 'total' => 0];
+        }
+        $selectedWeekUserTotals[$name]['count']++;
+        $selectedWeekUserTotals[$name]['total'] += (int)($order['price'] ?? 0);
+    }
+    uasort($selectedWeekUserTotals, static fn(array $a, array $b): int => $b['total'] <=> $a['total']);
+}
 $deadline = deadlineTimestamp($settings);
 $ordersClosed = $deadline !== null && time() >= $deadline;
 $deadlineValue = (string)($settings['order_deadline'] ?? '');
@@ -667,13 +733,14 @@ button:disabled,input:disabled{opacity:.5;cursor:not-allowed;transform:none}.men
 .actions{display:flex;gap:8px}.actions>*{flex:1;min-width:0}.actions button{padding:9px}.admin{border-color:#86efac}
 .order-form{display:grid;grid-template-columns:1.2fr .6fr;gap:10px}.order-form .wide{grid-column:1/-1}
 table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:left;padding:10px;background:#fffaf5}th{color:var(--dim);font-size:.78rem;text-transform:uppercase}td:first-child,th:first-child{border-radius:12px 0 0 12px}td:last-child,th:last-child{border-radius:0 12px 12px 0}
+.history-panel{margin-top:20px}.history-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}.history-stat{padding:14px;border-radius:16px;background:#fff7ed;border:1px solid #fed7aa}.history-stat strong{display:block;margin-top:4px;font-size:1.35rem;color:#9a3412}.history-table-wrap{overflow-x:auto}.history-table{min-width:760px}.status-tag{display:inline-block;padding:4px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:.75rem;font-weight:800}.status-tag.pending{background:#fef3c7;color:#92400e}
 .sidebar{position:sticky;top:20px}.total-badge{white-space:nowrap;color:#9a3412;background:#ffedd5;border-radius:999px;padding:6px 10px;font-weight:800}
 .bubble-bg{position:absolute;right:18px;bottom:12px;color:rgba(120,53,15,.16);font-size:3rem;line-height:1;pointer-events:none}
 .order-dialog{width:min(440px,calc(100% - 32px));padding:0;border:0;border-radius:24px;background:#fffaf5;color:var(--text);box-shadow:0 28px 80px rgba(120,53,15,.35)}
 .order-dialog::backdrop{background:rgba(67,34,15,.58);backdrop-filter:blur(3px)}
 .order-dialog-card{padding:24px}.order-dialog h2{margin:0;color:#9a3412}.order-dialog p{margin:8px 0 14px;color:var(--dim)}
 .order-dialog .actions{margin-top:18px}.order-dialog .actions button{margin-top:0}.secondary{background:#fff;color:#9a3412;border:1px solid #fdba74;box-shadow:none}
-@media(max-width:900px){body{padding:14px}.hero{display:block}.status-strip{justify-content:flex-start;margin-top:14px}.layout{grid-template-columns:1fr}.sidebar{position:static}.order-form{grid-template-columns:1fr}}
+@media(max-width:900px){body{padding:14px}.hero{display:block}.status-strip{justify-content:flex-start;margin-top:14px}.layout{grid-template-columns:1fr}.sidebar{position:static}.order-form{grid-template-columns:1fr}.history-summary{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -879,6 +946,65 @@ $actionLabels = [
 <?php endif; ?>
 </aside>
 </div>
+<?php if (!empty($_SESSION['is_admin'])): ?>
+<section class="box admin history-panel">
+<div class="section-title">
+<div>
+<h2>每週歷史點單</h2>
+<small class="muted">結單後的訂單會持續保留，可依週次查看。</small>
+</div>
+<span class="total-badge"><?= count($weeklyHistory) ?> 週</span>
+</div>
+<?php if ($weeklyHistory): ?>
+<form method="get">
+<label for="historyWeek">選擇週次</label>
+<select id="historyWeek" name="history_week" onchange="this.form.submit()">
+<?php foreach ($weeklyHistory as $weekStart => $weekOrders): ?>
+<?php $weekEnd = (new DateTimeImmutable($weekStart))->modify('+6 days')->format('Y-m-d'); ?>
+<option value="<?= h($weekStart) ?>" <?= $selectedHistoryWeek === $weekStart ? 'selected' : '' ?>>
+<?= h($weekStart) ?> ～ <?= h($weekEnd) ?>（<?= count($weekOrders) ?> 筆）
+</option>
+<?php endforeach; ?>
+</select>
+</form>
+<?php
+$selectedWeekTotal = array_sum(array_map(static fn(array $order): int => (int)($order['price'] ?? 0), $selectedWeekOrders));
+$selectedWeekEnd = (new DateTimeImmutable($selectedHistoryWeek))->modify('+6 days')->format('Y-m-d');
+?>
+<div class="history-summary">
+<div class="history-stat"><span class="muted">統計期間</span><strong><?= h($selectedHistoryWeek) ?><br><small>至 <?= h($selectedWeekEnd) ?></small></strong></div>
+<div class="history-stat"><span class="muted">點單數 / 人數</span><strong><?= count($selectedWeekOrders) ?> 筆 / <?= count($selectedWeekUserTotals) ?> 人</strong></div>
+<div class="history-stat"><span class="muted">訂單總金額</span><strong>$<?= h($selectedWeekTotal) ?></strong></div>
+</div>
+<h3>個人統計</h3>
+<div class="history-table-wrap">
+<table><thead><tr><th>人員</th><th>點單數</th><th>消費金額</th></tr></thead><tbody>
+<?php foreach ($selectedWeekUserTotals as $name => $totals): ?>
+<tr><td><?= h($name) ?></td><td><?= h($totals['count']) ?> 筆</td><td>$<?= h($totals['total']) ?></td></tr>
+<?php endforeach; ?>
+</tbody></table>
+</div>
+<h3>逐筆紀錄</h3>
+<div class="history-table-wrap">
+<table class="history-table"><thead><tr><th>日期時間</th><th>下單人</th><th>品項</th><th>金額</th><th>今日心情</th><th>狀態</th></tr></thead><tbody>
+<?php foreach ($selectedWeekOrders as $order): ?>
+<?php $isPending = ($order['history_status'] ?? '') === '未結單'; ?>
+<tr>
+<td><?= h($order['date'] ?? '') ?><br><small class="muted"><?= h($order['time'] ?? '') ?></small></td>
+<td><?= h($order['user'] ?? '') ?></td>
+<td><?= h($order['item'] ?? '') ?></td>
+<td>$<?= h($order['price'] ?? 0) ?></td>
+<td><?= h($order['mood'] ?? '無') ?></td>
+<td><span class="status-tag <?= $isPending ? 'pending' : '' ?>"><?= h($order['history_status'] ?? '已結單') ?></span></td>
+</tr>
+<?php endforeach; ?>
+</tbody></table>
+</div>
+<?php else: ?>
+<p class="muted">目前尚無歷史點單資料，第一次結單後會自動顯示在這裡。</p>
+<?php endif; ?>
+</section>
+<?php endif; ?>
 </div>
 <dialog id="orderUserDialog" class="order-dialog">
 <div class="order-dialog-card">
