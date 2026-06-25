@@ -306,7 +306,7 @@ if (empty($_SESSION['app_authenticated'])) {
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>?∵撮豰????????蝯?/title>
+        <title>威杰飲料管理系統</title>
         <style>
             body{margin:0;background:#0f172a;color:#f8fafc;font-family:system-ui;display:grid;place-items:center;min-height:100vh}
             form{width:min(360px,calc(100% - 48px));background:#1e293b;padding:28px;border-radius:18px}
@@ -317,11 +317,11 @@ if (empty($_SESSION['app_authenticated'])) {
     </head>
     <body>
     <form method="post">
-        <h1>?∵撮豰????????蝯?/h1>
-        <p>?ｇ???鈭?閰剁????????□??????/p>
+        <h1>威杰飲料管理系統</h1>
+        <p>請輸入共用密碼進入點餐系統</p>
         <?php if ($authError): ?><p class="error"><?= h($authError) ?></p><?php endif; ?>
         <input type="password" name="password" autocomplete="current-password" required autofocus>
-        <button name="app_login" value="1">?????蝯?/button>
+        <button name="app_login" value="1">登入系統</button>
     </form>
     </body>
     </html>
@@ -716,7 +716,7 @@ $currentOrders = $orders;
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>?∵撮豰????????蝯?/title>
+<title>威杰飲料管理系統</title>
 <style>
 :root{--primary:#f97316;--primary-soft:#fed7aa;--success:#22c55e;--bg:#fff7ed;--panel:#ffffff;--panel-strong:#ffedd5;--text:#1f2937;--dim:#6b7280;--line:#fdba74;--danger:#ef4444;--shadow:0 18px 45px rgba(154,52,18,.14)}
 *{box-sizing:border-box}
@@ -761,13 +761,13 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <div class="app-shell">
 <header class="hero">
 <div>
-<h1>?∵撮豰????????蝯?/h1>
-<p>????蹓??謚軋??蹓領菟蹇??蹓??獢?????鈭?豲??餅???蹓??堊垣??/p>
+<h1>威杰飲料管理系統</h1>
+<p>開團、菜單、訂單與結單都集中管理，讓飲料團更順手。</p>
 </div>
 <div class="status-strip">
-<span class="pill">????剔飭?<?= h((string)($settings['organizer'] ?? '?垮謓舫??')) ?></span>
-<span class="pill">????? <?= h((int)($settings['group_count'] ?? 0)) ?> ??/span>
-<span class="pill"><?= count($currentOrders) ?> ?????/span>
+<span class="pill">開團人：<?= h((string)($settings['organizer'] ?? '尚未設定')) ?></span>
+<span class="pill">累計開團 <?= h((int)($settings['group_count'] ?? 0)) ?> 次</span>
+<span class="pill"><?= count($currentOrders) ?> 筆訂單</span>
 <span class="pill">$<?= h(array_sum(array_map(static fn(array $order): int => (int)($order['price'] ?? 0), $currentOrders))) ?></span>
 </div>
 </header>
@@ -787,7 +787,7 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <label>?????/label>
 <select name="organizer" required>
-<option value="">?ｇ蹓????謢萇?</option>
+<option value="">請選擇開團人</option>
 <?php foreach ($users as $name => $_balance): ?>
 <option value="<?= h($name) ?>" <?= ($settings['organizer'] ?? '') === $name ? 'selected' : '' ?>><?= h($name) ?></option>
 <?php endforeach; ?>
@@ -795,34 +795,34 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <label>?殉?謘???翰?蹇?????謅????</label>
 <div class="actions">
 <select name="deadline_date" aria-label="???翰?鈭?">
-<option value="">?????/option>
+<option value="">不設定</option>
 <?php foreach ($deadlineDates as $dateValue => $dateLabel): ?>
 <option value="<?= h($dateValue) ?>" <?= $selectedDeadlineDate === $dateValue ? 'selected' : '' ?>><?= h($dateLabel) ?></option>
 <?php endforeach; ?>
 </select>
 <select name="deadline_hour" aria-label="???翰??">
 <?php for ($hour = 0; $hour < 24; $hour++): $hourValue = str_pad((string)$hour, 2, '0', STR_PAD_LEFT); ?>
-<option value="<?= $hourValue ?>" <?= $selectedDeadlineHour === $hourValue ? 'selected' : '' ?>><?= $hourValue ?> ??/option>
+<option value="<?= $hourValue ?>" <?= $selectedDeadlineHour === $hourValue ? 'selected' : '' ?>><?= $hourValue ?> 時</option>
 <?php endfor; ?>
 </select>
 <select name="deadline_minute" aria-label="???翰???">
 <?php foreach (['00', '10', '20', '30', '40', '50'] as $minuteValue): ?>
-<option value="<?= $minuteValue ?>" <?= $selectedDeadlineMinute === $minuteValue ? 'selected' : '' ?>><?= $minuteValue ?> ??/option>
+<option value="<?= $minuteValue ?>" <?= $selectedDeadlineMinute === $minuteValue ? 'selected' : '' ?>><?= $minuteValue ?> 分</option>
 <?php endforeach; ?>
 </select>
 </div>
-<button name="public_action" value="update_group">???????剔?????翰?蹇?</button>
+<button name="public_action" value="update_group">儲存開團人與截止時間</button>
 </form>
 </div>
 <div class="box">
 <h2>?謚軋????</h2>
-<span class="bubble-bg">??????/span>
+<span class="bubble-bg">茶 珍珠</span>
 <form method="post" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <?php if ($menuLibrary): ?>
 <label>????謚軋?</label>
 <select name="history_menu_id">
-<option value="">?????賡◢?????/option>
+<option value="">不使用歷史菜單</option>
 <?php foreach (array_reverse($menuLibrary, true) as $menuId => $menuItem): ?>
 <option value="<?= h($menuId) ?>"><?= h($menuItem['name'] ?? '歷史菜單') ?></option>
 <?php endforeach; ?>
@@ -831,7 +831,7 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <label>??蹌????獢???/label>
 <input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp">
 <input type="text" name="menu_label" maxlength="60" placeholder="????獢??╡???蹌行???殉朱?????>
-<button name="public_action" value="update_menu">??????謚軋?????殉??謚軋?</button>
+<button name="public_action" value="update_menu">套用歷史菜單／上傳新菜單</button>
 </form>
 <?php if ($menuLibrary): ?>
 <form method="post">
@@ -843,15 +843,15 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <?php endforeach; ?>
 </select>
 <input type="text" name="history_menu_name" maxlength="60" placeholder="????謚軋????" required>
-<button name="public_action" value="rename_menu">?皝?????謚軋????</button>
+<button name="public_action" value="rename_menu">修改歷史菜單名稱</button>
 </form>
 <?php endif; ?>
 </div>
 <div class="box">
 <h2>?荒?謘???</h2>
-<form method="post" onsubmit="return confirm('?????荒?謘?賹謕???謒????剁?蟡?蹓潮??澗??????畾?????CSV ??謕?擗??)">
+<form method="post" onsubmit="return confirm('確定要結單嗎？系統會下載 CSV 並扣除個人金額。')">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<button class="success" name="public_action" value="settle_group" <?= $orders ? '' : 'disabled' ?>>?荒?謘?????CSV</button>
+<button class="success" name="public_action" value="settle_group" <?= $orders ? '' : 'disabled' ?>>結單並下載 CSV</button>
 </form>
 </div>
 <div class="box">
@@ -859,29 +859,29 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <label>?輯撒?????獢??死?</label>
 <select id="user">
 <?php foreach ($balances as $name => $balance): ?>
-<option value="<?= h($name) ?>"><?= h($name) ?>??<?= h($balance) ?>??/option>
+<option value="<?= h($name) ?>"><?= h($name) ?>：<?= h($balance) ?></option>
 <?php endforeach; ?>
 </select>
 </div>
-<?php if (is_file($menuFile)): ?><div class="box menu-card"><div class="section-title"><h2>??謑?謚軋?</h2><span class="total-badge">?綜竣?????鈭?</span></div><img class="menu" src="/?menu_image=1" alt="??謑?謚軋?"></div><?php endif; ?>
+<?php if (is_file($menuFile)): ?><div class="box menu-card"><div class="section-title"><h2>今日菜單</h2><span class="total-badge">目前使用中</span></div><img class="menu" src="/?menu_image=1" alt="今日菜單"></div><?php endif; ?>
 <div class="box">
-<div class="section-title"><h2>?啣?閮</h2><span class="total-badge"><?= $ordersClosed ? '已截止' : '開放中' ?></span></div>
+<div class="section-title"><h2>新增訂單</h2><span class="total-badge"><?= $ordersClosed ? '已截止' : '開放中' ?></span></div>
 <div class="order-form">
-<input id="item" maxlength="100" placeholder="?蹓????縈?????????箸????? required <?= $ordersClosed ? 'disabled' : '' ?>>
-<input id="price" type="number" min="1" max="100000" placeholder="?撖僱" required <?= $ordersClosed ? 'disabled' : '' ?>>
-<input class="wide" id="mood" maxlength="100" placeholder="??謑?????縈???鈭????謚??綜窖?蹓魂??蹓????" <?= $ordersClosed ? 'disabled' : '' ?>>
+<input id="item" maxlength="100" placeholder="品項，例如：珍珠奶茶 微糖少冰" required <?= $ordersClosed ? 'disabled' : '' ?>>
+<input id="price" type="number" min="1" max="100000" placeholder="金額" required <?= $ordersClosed ? 'disabled' : '' ?>>
+<input class="wide" id="mood" maxlength="100" placeholder="今日心情，例如：今天想喝甜一點、去冰、加珍珠" <?= $ordersClosed ? 'disabled' : '' ?>>
 </div>
 <button class="success" onclick="createOrder()" <?= $ordersClosed ? 'disabled' : '' ?>><?= $ordersClosed ? '訂單已截止' : '送出訂單' ?></button>
 </div>
 <div class="box">
-<div class="section-title"><h2>?????謑蹇?</h2><span class="total-badge">??剛??/ ??畸?</span></div>
+<div class="section-title"><h2>我的訂單</h2><span class="total-badge">可修改 / 可刪除</span></div>
 <div id="mine"></div>
 </div>
 </section>
 <aside class="sidebar">
 <div class="box">
-<div class="section-title"><h2>??謑蹇?</h2><span class="total-badge"><?= count($currentOrders) ?> ??/span></div>
-<table><thead><tr><th>?軋? / ?蹓?</th><th>?撖僱</th><th>??謑??</th></tr></thead><tbody>
+<div class="section-title"><h2>目前訂單</h2><span class="total-badge"><?= count($currentOrders) ?> 筆</span></div>
+<table><thead><tr><th>人員 / 品項</th><th>金額</th><th>今日心情</th></tr></thead><tbody>
 <?php foreach (array_reverse($currentOrders) as $order): ?>
 <tr><td><small class="muted"><?= h($order['user']) ?></small><br><?= h($order['item']) ?></td><td>$<?= h($order['price']) ?></td><td><?= h($order['mood'] ?? '無') ?></td></tr>
 <?php endforeach; ?>
@@ -889,32 +889,32 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 </div>
 <?php if (!empty($_SESSION['is_admin'])): ?>
 <div class="box admin">
-<h2>?????/h2>
+<h2>管理員後台</h2>
 <form method="post">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<label>?賣?????獢??死?</label>
+<label>選擇人員與金額</label>
 <select name="balance_user" required>
 <?php foreach ($balances as $name => $balance): ?>
-<option value="<?= h($name) ?>"><?= h($name) ?>??謆??$<?= h($balance) ?>??/option>
+<option value="<?= h($name) ?>"><?= h($name) ?>：餘額 $<?= h($balance) ?></option>
 <?php endforeach; ?>
 </select>
-<input type="number" name="target_balance" placeholder="?賣????? required>
+<input type="number" name="target_balance" placeholder="修改後金額" required>
 <input type="text" name="balance_note" maxlength="120" placeholder="?方葭??賹?????縈????瞏汕蹓????蹓箄函???">
-<button name="admin_action" value="set_balance">?皝?????死?</button>
+<button name="admin_action" value="set_balance">修改個人金額</button>
 </form>
 <form method="post">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<input type="text" name="user_name" maxlength="50" placeholder="?輯撒??????>
+<input type="text" name="user_name" maxlength="50" placeholder="人員姓名">
 <input type="number" name="initial_balance" placeholder="?豲??死?" value="0">
 <div class="actions">
-<button name="admin_action" value="add_user">???</button>
-<button class="danger" name="admin_action" value="delete_user">??畸?</button>
+<button name="admin_action" value="add_user">新增</button>
+<button class="danger" name="admin_action" value="delete_user">刪除</button>
 </div>
 </form>
-<h3>????賣?????/h3>
+<h3>金額修改紀錄</h3>
 <?php if ($balanceAudit): ?>
 <table>
-<thead><tr><th>?蹇? / ?剔???/th><th>???</th><th>?賹?</th></tr></thead>
+<thead><tr><th>時間 / 人員</th><th>動作</th><th>備註</th></tr></thead>
 <tbody>
 <?php foreach ($balanceAudit as $audit): ?>
 <?php
@@ -931,10 +931,10 @@ $actionLabels = [
 <tr>
 <td><small class="muted"><?= h($audit['time'] ?? '') ?></small><br><?= h($audit['user'] ?? '') ?></td>
 <td>
-<?= h($actionLabels[$audit['action'] ?? ''] ?? ($audit['action'] ?? '???')) ?><br>
+<?= h($actionLabels[$audit['action'] ?? ''] ?? ($audit['action'] ?? '其他')) ?><br>
 <small class="muted">
 <?= $beforeAudit === null ? '無' : '$' . h($beforeAudit) ?> → <?= $afterAudit === null ? '無' : '$' . h($afterAudit) ?>
-<small>變動：<?= $amountAudit >= 0 ? '+' : '' ?><?= h($amountAudit) ?></small>
+變動：<?= $amountAudit >= 0 ? '+' : '' ?><?= h($amountAudit) ?></small>
 </td>
 <td><?= h(($audit['note'] ?? '') !== '' ? $audit['note'] : '無') ?></td>
 </tr>
@@ -942,18 +942,18 @@ $actionLabels = [
 </tbody>
 </table>
 <?php else: ?>
-<p class="muted">?垓?????賣??????/p>
+<p class="muted">尚無修改紀錄。</p>
 <?php endif; ?>
-<p><a class="muted" href="/?logout=1">?擗</a></p>
+<p><a class="muted" href="/?logout=1">登出</a></p>
 </div>
 <?php else: ?>
 <div class="box">
-<h2>?????貝??/h2>
+<h2>管理員登入</h2>
 <?php if ($loginError): ?><p style="color:var(--danger)"><?= h($loginError) ?></p><?php endif; ?>
 <form method="post">
-<input name="username" autocomplete="username" placeholder="???" required>
-<input type="password" name="password" autocomplete="current-password" placeholder="???? required>
-<button name="admin_login" value="1">?擗</button>
+<input name="username" autocomplete="username" placeholder="帳號" required>
+<input type="password" name="password" autocomplete="current-password" placeholder="密碼" required>
+<button name="admin_login" value="1">登入</button>
 </form>
 </div>
 <?php endif; ?>
@@ -963,19 +963,19 @@ $actionLabels = [
 <section class="box admin history-panel">
 <div class="section-title">
 <div>
-<h2>?伍??◢?????/h2>
-<small class="muted">?荒?謘???殉?謘????伐??謕??????暑?鈭???/small>
+<h2>每週歷史點單</h2>
+<small class="muted">結單後會保留歷史紀錄，也會納入目前未結單訂單。</small>
 </div>
-<span class="total-badge"><?= count($weeklyHistory) ?> ??/span>
+<span class="total-badge"><?= count($weeklyHistory) ?> 週</span>
 </div>
 <?php if ($weeklyHistory): ?>
 <form method="get">
-<label for="historyWeek">?鞊???暑</label>
+<label for="historyWeek">選擇週次</label>
 <select id="historyWeek" name="history_week" onchange="this.form.submit()">
 <?php foreach ($weeklyHistory as $weekStart => $weekOrders): ?>
 <?php $weekEnd = (new DateTimeImmutable($weekStart))->modify('+6 days')->format('Y-m-d'); ?>
 <option value="<?= h($weekStart) ?>" <?= $selectedHistoryWeek === $weekStart ? 'selected' : '' ?>>
-<?= h($weekStart) ?> ??<?= h($weekEnd) ?>???= count($weekOrders) ?> ???
+<?= h($weekStart) ?> 至 <?= h($weekEnd) ?>（<?= count($weekOrders) ?> 筆）
 </option>
 <?php endforeach; ?>
 </select>
@@ -985,21 +985,21 @@ $selectedWeekTotal = array_sum(array_map(static fn(array $order): int => (int)($
 $selectedWeekEnd = (new DateTimeImmutable($selectedHistoryWeek))->modify('+6 days')->format('Y-m-d');
 ?>
 <div class="history-summary">
-<div class="history-stat"><span class="muted">?舀０??賹?</span><strong><?= h($selectedHistoryWeek) ?><br><small>??<?= h($selectedWeekEnd) ?></small></strong></div>
-<div class="history-stat"><span class="muted">?綜竣謘??/ ?剔捂??/span><strong><?= count($selectedWeekOrders) ?> ??/ <?= count($selectedWeekUserTotals) ?> ??/strong></div>
-<div class="history-stat"><span class="muted">?殉?謘鞈???/span><strong>$<?= h($selectedWeekTotal) ?></strong></div>
+<div class="history-stat"><span class="muted">統計期間</span><strong><?= h($selectedHistoryWeek) ?><br><small>至 <?= h($selectedWeekEnd) ?></small></strong></div>
+<div class="history-stat"><span class="muted">點單數 / 人數</span><strong><?= count($selectedWeekOrders) ?> 筆 / <?= count($selectedWeekUserTotals) ?> 人</strong></div>
+<div class="history-stat"><span class="muted">訂單總金額</span><strong>$<?= h($selectedWeekTotal) ?></strong></div>
 </div>
-<h3>????舀０?</h3>
+<h3>個人統計</h3>
 <div class="history-table-wrap">
-<table><thead><tr><th>?剔???/th><th>?綜竣謘??/th><th>?剁?蟡???</th></tr></thead><tbody>
+<table><thead><tr><th>人員</th><th>點單數</th><th>消費金額</th></tr></thead><tbody>
 <?php foreach ($selectedWeekUserTotals as $name => $totals): ?>
-<tr><td><?= h($name) ?></td><td><?= h($totals['count']) ?> ??/td><td>$<?= h($totals['total']) ?></td></tr>
+<tr><td><?= h($name) ?></td><td><?= h($totals['count']) ?> 筆</td><td>$<?= h($totals['total']) ?></td></tr>
 <?php endforeach; ?>
 </tbody></table>
 </div>
-<h3>??????/h3>
+<h3>詳細紀錄</h3>
 <div class="history-table-wrap">
-<table class="history-table"><thead><tr><th>?鈭??蹇?</th><th>??謘?/th><th>?蹓?</th><th>???</th><th>??謑??</th><th>????/th></tr></thead><tbody>
+<table class="history-table"><thead><tr><th>日期時間</th><th>下單人</th><th>品項</th><th>金額</th><th>今日心情</th><th>狀態</th></tr></thead><tbody>
 <?php foreach ($selectedWeekOrders as $order): ?>
 <?php $isPending = ($order['history_status'] ?? '') === '未結單'; ?>
 <tr>
@@ -1014,25 +1014,25 @@ $selectedWeekEnd = (new DateTimeImmutable($selectedHistoryWeek))->modify('+6 day
 </tbody></table>
 </div>
 <?php else: ?>
-<p class="muted">?獢??垓????綜竣謘????瘣菟??????獢???賂?????瑞?謓?謕???/p>
+<p class="muted">目前尚無歷史點單資料，第一次結單後會自動顯示在這裡。</p>
 <?php endif; ?>
 </section>
 <?php endif; ?>
 </div>
 <dialog id="orderUserDialog" class="order-dialog">
 <div class="order-dialog-card">
-<h2>?ｇ??⊿???獢?</h2>
-<p>???綽?????ｇ蹓??倦謕?????芰??殉????/p>
-<label for="orderUser">?蟡暑??謘?/label>
+<h2>確認下單人</h2>
+<p>請再次確認本次下單人，避免忘記選擇人員。</p>
+<label for="orderUser">本次下單人</label>
 <select id="orderUser" required>
-<option value="">?ｇ蹓??函???/option>
+<option value="">請選擇下單人</option>
 <?php foreach ($balances as $name => $balance): ?>
-<option value="<?= h($name) ?>"><?= h($name) ?>??<?= h($balance) ?>??/option>
+<option value="<?= h($name) ?>"><?= h($name) ?>：<?= h($balance) ?></option>
 <?php endforeach; ?>
 </select>
 <div class="actions">
-<button type="button" class="secondary" onclick="closeOrderUserDialog()">擗???賣??/button>
-<button type="button" class="success" onclick="confirmOrderUser()">?????蹓鳴</button>
+<button type="button" class="secondary" onclick="closeOrderUserDialog()">取消修改</button>
+<button type="button" class="success" onclick="confirmOrderUser()">確認送出</button>
 </div>
 </div>
 </dialog>
@@ -1088,7 +1088,7 @@ async function editOrder(id){
 }
 function renderMine(){
   const mine=orders.filter(o=>o.user===userEl.value);
-  document.getElementById('mine').innerHTML=mine.length?mine.map(o=>`<div class="order"><b>${esc(o.item)}</b> $${o.price}<br><small class="muted">${esc(o.mood||'無')} ${esc(o.time)}</small>${ordersClosed?'':`<div class="actions"><button onclick="editOrder('${o.id}')">靽格</button><button class="danger" onclick="removeOrder('${o.id}')">?芷</button></div>`}</div>`).join(''):'<p class="muted">?桀?瘝?閮</p>';
+  document.getElementById('mine').innerHTML=mine.length?mine.map(o=>`<div class="order"><b>${esc(o.item)}</b> $${o.price}<br><small class="muted">${esc(o.mood||'無')} ${esc(o.time)}</small>${ordersClosed?'':`<div class="actions"><button onclick="editOrder('${o.id}')">修改</button><button class="danger" onclick="removeOrder('${o.id}')">刪除</button></div>`}</div>`).join(''):'<p class="muted">目前沒有訂單</p>';
 }
 userEl.addEventListener('change',renderMine);renderMine();
 </script>
