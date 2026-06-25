@@ -545,7 +545,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
     $publicAction = (string)$_POST['public_action'];
     if ($publicAction === 'rename_menu') {
         $menuId = trim((string)($_POST['history_menu_id'] ?? ''));
-        $newName = menuLabel((string)($_POST['history_menu_name'] ?? ''), '????謚軋?');
+        $newName = menuLabel((string)($_POST['history_menu_name'] ?? ''), '歷史菜單');
         if ($menuId !== '' && isset($menuLibrary[$menuId])) {
             $menuLibrary[$menuId]['name'] = $newName;
             saveMenuLibrary($menuLibraryFile, $menuLibrary);
@@ -557,7 +557,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
         $organizer = (string)($settings['organizer'] ?? '');
         if ($organizer === '' || !array_key_exists($organizer, $users)) {
             http_response_code(422);
-            exit('?ｇ???桀?????????謢萇?');
+            exit('請先設定有效的開團人');
         }
         $csvName = settleOrders($ordersFile, $usersFile, $historyDir, $balanceAuditFile, $orders, $users);
         if ($csvName === null) {
@@ -678,7 +678,7 @@ if (!empty($_SESSION['is_admin'])) {
         (string)($a['date'] ?? '') . ' ' . (string)($a['time'] ?? '')
     ));
     foreach ($selectedWeekOrders as $order) {
-        $name = (string)($order['user'] ?? '??堊?');
+        $name = (string)($order['user'] ?? '未知');
         if (!isset($selectedWeekUserTotals[$name])) {
             $selectedWeekUserTotals[$name] = ['count' => 0, 'total' => 0];
         }
@@ -782,30 +782,30 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <?php endif; ?>
 </div>
 <div class="box">
-<h2>????桀??</h2>
+<h2>開團設定</h2>
 <form method="post" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<label>?????/label>
+<label>開團人</label>
 <select name="organizer" required>
 <option value="">請選擇開團人</option>
 <?php foreach ($users as $name => $_balance): ?>
 <option value="<?= h($name) ?>" <?= ($settings['organizer'] ?? '') === $name ? 'selected' : '' ?>><?= h($name) ?></option>
 <?php endforeach; ?>
 </select>
-<label>?殉?謘???翰?蹇?????謅????</label>
+<label>訂單截止時間（台北時間）</label>
 <div class="actions">
-<select name="deadline_date" aria-label="???翰?鈭?">
+<select name="deadline_date" aria-label="截止日期">
 <option value="">不設定</option>
 <?php foreach ($deadlineDates as $dateValue => $dateLabel): ?>
 <option value="<?= h($dateValue) ?>" <?= $selectedDeadlineDate === $dateValue ? 'selected' : '' ?>><?= h($dateLabel) ?></option>
 <?php endforeach; ?>
 </select>
-<select name="deadline_hour" aria-label="???翰??">
+<select name="deadline_hour" aria-label="截止小時">
 <?php for ($hour = 0; $hour < 24; $hour++): $hourValue = str_pad((string)$hour, 2, '0', STR_PAD_LEFT); ?>
 <option value="<?= $hourValue ?>" <?= $selectedDeadlineHour === $hourValue ? 'selected' : '' ?>><?= $hourValue ?> 時</option>
 <?php endfor; ?>
 </select>
-<select name="deadline_minute" aria-label="???翰???">
+<select name="deadline_minute" aria-label="截止分鐘">
 <?php foreach (['00', '10', '20', '30', '40', '50'] as $minuteValue): ?>
 <option value="<?= $minuteValue ?>" <?= $selectedDeadlineMinute === $minuteValue ? 'selected' : '' ?>><?= $minuteValue ?> 分</option>
 <?php endforeach; ?>
@@ -815,12 +815,12 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 </form>
 </div>
 <div class="box">
-<h2>?謚軋????</h2>
+<h2>菜單上傳</h2>
 <span class="bubble-bg">茶 珍珠</span>
 <form method="post" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <?php if ($menuLibrary): ?>
-<label>????謚軋?</label>
+<label>歷史菜單</label>
 <select name="history_menu_id">
 <option value="">不使用歷史菜單</option>
 <?php foreach (array_reverse($menuLibrary, true) as $menuId => $menuItem): ?>
@@ -828,35 +828,35 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <?php endforeach; ?>
 </select>
 <?php endif; ?>
-<label>??蹌????獢???/label>
+<label>上傳新菜單圖片</label>
 <input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp">
-<input type="text" name="menu_label" maxlength="60" placeholder="????獢??╡???蹌行???殉朱?????>
+<input type="text" name="menu_label" maxlength="60" placeholder="菜單名稱，例如：清心福全、五十嵐">
 <button name="public_action" value="update_menu">套用歷史菜單／上傳新菜單</button>
 </form>
 <?php if ($menuLibrary): ?>
 <form method="post">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<label>?箏?拍???謚軋????</label>
+<label>修改歷史菜單名稱</label>
 <select name="history_menu_id" required>
 <?php foreach (array_reverse($menuLibrary, true) as $menuId => $menuItem): ?>
 <option value="<?= h($menuId) ?>"><?= h($menuItem['name'] ?? '歷史菜單') ?></option>
 <?php endforeach; ?>
 </select>
-<input type="text" name="history_menu_name" maxlength="60" placeholder="????謚軋????" required>
+<input type="text" name="history_menu_name" maxlength="60" placeholder="新的菜單名稱" required>
 <button name="public_action" value="rename_menu">修改歷史菜單名稱</button>
 </form>
 <?php endif; ?>
 </div>
 <div class="box">
-<h2>?荒?謘???</h2>
+<h2>結單工具</h2>
 <form method="post" onsubmit="return confirm('確定要結單嗎？系統會下載 CSV 並扣除個人金額。')">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <button class="success" name="public_action" value="settle_group" <?= $orders ? '' : 'disabled' ?>>結單並下載 CSV</button>
 </form>
 </div>
 <div class="box">
-<h2>????綜筐?</h2>
-<label>?輯撒?????獢??死?</label>
+<h2>人員選擇</h2>
+<label>選擇目前查看的人員餘額</label>
 <select id="user">
 <?php foreach ($balances as $name => $balance): ?>
 <option value="<?= h($name) ?>"><?= h($name) ?>：<?= h($balance) ?></option>
@@ -899,13 +899,13 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <?php endforeach; ?>
 </select>
 <input type="number" name="target_balance" placeholder="修改後金額" required>
-<input type="text" name="balance_note" maxlength="120" placeholder="?方葭??賹?????縈????瞏汕蹓????蹓箄函???">
+<input type="text" name="balance_note" maxlength="120" placeholder="調整原因，例如：儲值、補扣、修正金額">
 <button name="admin_action" value="set_balance">修改個人金額</button>
 </form>
 <form method="post">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <input type="text" name="user_name" maxlength="50" placeholder="人員姓名">
-<input type="number" name="initial_balance" placeholder="?豲??死?" value="0">
+<input type="number" name="initial_balance" placeholder="初始金額" value="0">
 <div class="actions">
 <button name="admin_action" value="add_user">新增</button>
 <button class="danger" name="admin_action" value="delete_user">刪除</button>
@@ -1046,14 +1046,14 @@ const orderUserEl=document.getElementById('orderUser');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(payload){
   const response=await fetch('/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,csrf})});
-  const data=await response.json().catch(()=>({error:'????剜??'}));
-  if(!response.ok)throw new Error(data.error||'????剜??');
+  const data=await response.json().catch(()=>({error:'系統回應錯誤'}));
+  if(!response.ok)throw new Error(data.error||'系統回應錯誤');
   return data;
 }
 async function createOrder(){
   if(ordersClosed)return alert('訂單已截止');
   const item=document.getElementById('item').value.trim(),price=Number(document.getElementById('price').value);
-  if(!item||!Number.isInteger(price)||price<=0)return alert('?ｇ???鈭????????撖僱');
+  if(!item||!Number.isInteger(price)||price<=0)return alert('請輸入品項與正確金額');
   orderUserEl.value='';
   orderUserDialog.showModal();
   orderUserEl.focus();
@@ -1067,7 +1067,7 @@ async function confirmOrderUser(){
   const item=document.getElementById('item').value.trim(),price=Number(document.getElementById('price').value);
   if(!item||!Number.isInteger(price)||price<=0){
     orderUserDialog.close();
-    return alert('?ｇ???鈭????????撖僱');
+    return alert('請輸入品項與正確金額');
   }
   userEl.value=user;
   await api({action:'create',user,item,price,mood:document.getElementById('mood').value});
@@ -1075,15 +1075,15 @@ async function confirmOrderUser(){
 }
 async function removeOrder(id){
   if(ordersClosed)return alert('訂單已截止');
-  if(!confirm('??????畸????畾?'))return;
+  if(!confirm('確定要刪除這筆訂單嗎？'))return;
   await api({action:'delete',user:userEl.value,id});location.reload();
 }
 async function editOrder(id){
   if(ordersClosed)return alert('訂單已截止');
   const order=orders.find(o=>o.id===id);
-  const item=prompt('?蹓?',order.item);if(item===null)return;
-  const price=Number(prompt('?寞',order.price));if(!item.trim()||!Number.isInteger(price)||price<=0)return alert('輸入不正確');
-  const mood=prompt('隞敹?',order.mood||'無');if(mood===null)return;
+  const item=prompt('品項',order.item);if(item===null)return;
+  const price=Number(prompt('金額',order.price));if(!item.trim()||!Number.isInteger(price)||price<=0)return alert('輸入不正確');
+  const mood=prompt('今日心情',order.mood||'無');if(mood===null)return;
   await api({action:'edit',user:userEl.value,id,item:item.trim(),price,mood});location.reload();
 }
 function renderMine(){
