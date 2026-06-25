@@ -36,7 +36,7 @@ if (!is_file($ordersFile)) {
     file_put_contents($ordersFile, '');
 }
 if (!is_file($usersFile)) {
-    file_put_contents($usersFile, json_encode(['蝞∠??? => 0], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    file_put_contents($usersFile, json_encode(['管理員' => 0], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
 if (!is_file($balanceAuditFile)) {
     file_put_contents($balanceAuditFile, '');
@@ -140,7 +140,7 @@ function menuLabel(string $label, string $fallback): string
         $label = trim(pathinfo($fallback, PATHINFO_FILENAME));
     }
     if ($label === '') {
-        $label = '?芸????;
+        $label = '歷史菜單';
     }
     return mb_substr($label, 0, 60);
 }
@@ -197,7 +197,7 @@ function loadArchivedOrders(string $historyDir): array
         }
         $settledAt = DateTimeImmutable::createFromFormat('!Ymd_His', $match[1], new DateTimeZone('Asia/Taipei'));
         foreach (loadOrders($file) as $order) {
-            $order['history_status'] = '撌脩???;
+            $order['history_status'] = '已結單';
             $order['settled_at'] = $settledAt ? $settledAt->format('Y-m-d H:i:s') : '';
             $items[] = $order;
         }
@@ -242,7 +242,7 @@ function settleOrders(
             'before_balance' => $before,
             'after_balance' => $after,
             'amount' => -$spent,
-            'note' => '蝯??狡',
+            'note' => '結單扣款',
         ]);
     }
     saveUsers($usersFile, $users);
@@ -253,9 +253,9 @@ function settleOrders(
     $csvName = 'report_' . $timestamp . '.csv';
     $csv = fopen($historyDir . '/' . $csvName, 'wb');
     fwrite($csv, "\xEF\xBB\xBF");
-    fputcsv($csv, ['?交?', '??', '雿輻??, '??', '?寞', '隞敹?']);
+    fputcsv($csv, ['日期', '時間', '下單人', '品項', '金額', '今日心情']);
     foreach ($orders as $order) {
-        fputcsv($csv, [$order['date'], $order['time'], $order['user'], $order['item'], $order['price'], $order['mood'] ?? '??]);
+        fputcsv($csv, [$order['date'], $order['time'], $order['user'], $order['item'], $order['price'], $order['mood'] ?? '無']);
     }
     fclose($csv);
     return $csvName;
@@ -287,7 +287,7 @@ if (isset($_GET['logout'])) {
 $authError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['app_login'])) {
     if ($appPassword === '') {
-        $authError = '隡箸??典??芾身摰?APP_PASSWORD??;
+        $authError = '系統尚未設定 APP_PASSWORD。';
     } elseif (hash_equals($appPassword, (string)($_POST['password'] ?? ''))) {
         session_regenerate_id(true);
         $_SESSION['app_authenticated'] = true;
@@ -295,7 +295,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['app_login'])) {
         header('Location: /');
         exit;
     } else {
-        $authError = '蝟餌絞撖Ⅳ?航炊??;
+        $authError = '系統密碼不正確。';
     }
 }
 
@@ -306,7 +306,7 @@ if (empty($_SESSION['app_authenticated'])) {
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>憡憌脫?蝞∠?蝟餌絞</title>
+        <title>?∵撮豰????????蝯?/title>
         <style>
             body{margin:0;background:#0f172a;color:#f8fafc;font-family:system-ui;display:grid;place-items:center;min-height:100vh}
             form{width:min(360px,calc(100% - 48px));background:#1e293b;padding:28px;border-radius:18px}
@@ -317,11 +317,11 @@ if (empty($_SESSION['app_authenticated'])) {
     </head>
     <body>
     <form method="post">
-        <h1>憡憌脫?蝞∠?蝟餌絞</h1>
-        <p>隢撓?亙?詨?典?蝣潘?皞?????/p>
+        <h1>?∵撮豰????????蝯?/h1>
+        <p>?ｇ???鈭?閰剁????????□??????/p>
         <?php if ($authError): ?><p class="error"><?= h($authError) ?></p><?php endif; ?>
         <input type="password" name="password" autocomplete="current-password" required autofocus>
-        <button name="app_login" value="1">?脣蝟餌絞</button>
+        <button name="app_login" value="1">?????蝯?/button>
     </form>
     </body>
     </html>
@@ -382,7 +382,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_login'])) {
         header('Location: /');
         exit;
     }
-    $loginError = '蝞∠??∪董??撖Ⅳ?航炊??;
+    $loginError = '管理員帳號或密碼不正確。';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['CONTENT_TYPE']) && str_contains($_SERVER['CONTENT_TYPE'], 'application/json')) {
@@ -397,7 +397,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['CONTENT_TYPE']) && 
     $user = trim((string)($payload['user'] ?? ''));
     if ($ordersClosed) {
         http_response_code(423);
-        echo json_encode(['success' => false, 'error' => '閮撌脫甇?], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success' => false, 'error' => '訂單已截止'], JSON_UNESCAPED_UNICODE);
         exit;
     }
     if (!array_key_exists($user, $users)) {
@@ -409,7 +409,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['CONTENT_TYPE']) && 
     if ($action === 'create') {
         $item = trim((string)($payload['item'] ?? ''));
         $price = filter_var($payload['price'] ?? null, FILTER_VALIDATE_INT);
-        $mood = trim((string)($payload['mood'] ?? '')) ?: '??;
+        $mood = trim((string)($payload['mood'] ?? '')) ?: '無';
         if ($item === '' || mb_strlen($item) > 100 || $price === false || $price <= 0 || $price > 100000) {
             http_response_code(422);
             echo json_encode(['success' => false, 'error' => 'Invalid order']);
@@ -452,7 +452,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['CONTENT_TYPE']) && 
         }
         $orders[$index]['item'] = $item;
         $orders[$index]['price'] = $price;
-        $orders[$index]['mood'] = mb_substr(trim((string)($payload['mood'] ?? '')) ?: '??, 0, 100);
+        $orders[$index]['mood'] = mb_substr(trim((string)($payload['mood'] ?? '')) ?: '無', 0, 100);
         saveOrders($ordersFile, $orders);
         echo json_encode(['success' => true]);
         exit;
@@ -481,12 +481,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
                 'before_balance' => null,
                 'after_balance' => $initialBalance,
                 'amount' => $initialBalance,
-                'note' => '?啣?鈭箏',
+                'note' => '新增人員',
             ]);
         }
     } elseif ($action === 'delete_user') {
         $name = trim((string)($_POST['user_name'] ?? ''));
-        if ($name !== '蝞∠??? && array_key_exists($name, $users)) {
+        if ($name !== '管理員' && array_key_exists($name, $users)) {
             $beforeBalance = (int)$users[$name];
             unset($users[$name]);
             saveUsers($usersFile, $users);
@@ -496,7 +496,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
                 'before_balance' => $beforeBalance,
                 'after_balance' => null,
                 'amount' => -$beforeBalance,
-                'note' => '?芷鈭箏',
+                'note' => '刪除人員',
             ]);
         }
     } elseif ($action === 'upload_menu' && isset($_FILES['menu_image'])) {
@@ -545,7 +545,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
     $publicAction = (string)$_POST['public_action'];
     if ($publicAction === 'rename_menu') {
         $menuId = trim((string)($_POST['history_menu_id'] ?? ''));
-        $newName = menuLabel((string)($_POST['history_menu_name'] ?? ''), '甇瑕?');
+        $newName = menuLabel((string)($_POST['history_menu_name'] ?? ''), '????謚軋?');
         if ($menuId !== '' && isset($menuLibrary[$menuId])) {
             $menuLibrary[$menuId]['name'] = $newName;
             saveMenuLibrary($menuLibraryFile, $menuLibrary);
@@ -557,7 +557,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['public_action'])) {
         $organizer = (string)($settings['organizer'] ?? '');
         if ($organizer === '' || !array_key_exists($organizer, $users)) {
             http_response_code(422);
-            exit('隢?閮剖??????犖');
+            exit('?ｇ???桀?????????謢萇?');
         }
         $csvName = settleOrders($ordersFile, $usersFile, $historyDir, $balanceAuditFile, $orders, $users);
         if ($csvName === null) {
@@ -654,7 +654,7 @@ $selectedWeekUserTotals = [];
 if (!empty($_SESSION['is_admin'])) {
     $historyOrders = array_merge(loadArchivedOrders($historyDir), array_map(
         static function (array $order): array {
-            $order['history_status'] = '?芰???;
+            $order['history_status'] = '未結單';
             $order['settled_at'] = '';
             return $order;
         },
@@ -678,7 +678,7 @@ if (!empty($_SESSION['is_admin'])) {
         (string)($a['date'] ?? '') . ' ' . (string)($a['time'] ?? '')
     ));
     foreach ($selectedWeekOrders as $order) {
-        $name = (string)($order['user'] ?? '?芰');
+        $name = (string)($order['user'] ?? '??堊?');
         if (!isset($selectedWeekUserTotals[$name])) {
             $selectedWeekUserTotals[$name] = ['count' => 0, 'total' => 0];
         }
@@ -697,7 +697,7 @@ $deadlineDates = [];
 for ($dayOffset = 0; $dayOffset < 14; $dayOffset++) {
     $dateOption = (new DateTimeImmutable('today', new DateTimeZone('Asia/Taipei')))
         ->modify('+' . $dayOffset . ' days');
-    $deadlineDates[$dateOption->format('Y-m-d')] = $dateOption->format('m/d') . '嚗? . ['??, '銝', '鈭?, '銝?, '??, '鈭?, '??][(int)$dateOption->format('w')] . '嚗?;
+    $deadlineDates[$dateOption->format('Y-m-d')] = $dateOption->format('m/d') . '（' . ['日', '一', '二', '三', '四', '五', '六'][(int)$dateOption->format('w')] . '）';
 }
 if ($selectedDeadlineDate !== '' && !isset($deadlineDates[$selectedDeadlineDate])) {
     $deadlineDates = [$selectedDeadlineDate => $selectedDeadlineDate] + $deadlineDates;
@@ -716,7 +716,7 @@ $currentOrders = $orders;
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>憡憌脫?蝞∠?蝟餌絞</title>
+<title>?∵撮豰????????蝯?/title>
 <style>
 :root{--primary:#f97316;--primary-soft:#fed7aa;--success:#22c55e;--bg:#fff7ed;--panel:#ffffff;--panel-strong:#ffedd5;--text:#1f2937;--dim:#6b7280;--line:#fdba74;--danger:#ef4444;--shadow:0 18px 45px rgba(154,52,18,.14)}
 *{box-sizing:border-box}
@@ -761,13 +761,13 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <div class="app-shell">
 <header class="hero">
 <div>
-<h1>憡憌脫?蝞∠?蝟餌絞</h1>
-<p>??????‵閮???桐?頛?隞予??暻潔???摰?/p>
+<h1>?∵撮豰????????蝯?/h1>
+<p>????蹓??謚軋??蹓領菟蹇??蹓??獢?????鈭?豲??餅???蹓??堊垣??/p>
 </div>
 <div class="status-strip">
-<span class="pill">??鈭綽?<?= h((string)($settings['organizer'] ?? '撠閮剖?')) ?></span>
-<span class="pill">蝝航??? <?= h((int)($settings['group_count'] ?? 0)) ?> 甈?/span>
-<span class="pill"><?= count($currentOrders) ?> 蝑???/span>
+<span class="pill">????剔飭?<?= h((string)($settings['organizer'] ?? '?垮謓舫??')) ?></span>
+<span class="pill">????? <?= h((int)($settings['group_count'] ?? 0)) ?> ??/span>
+<span class="pill"><?= count($currentOrders) ?> ?????/span>
 <span class="pill">$<?= h(array_sum(array_map(static fn(array $order): int => (int)($order['price'] ?? 0), $currentOrders))) ?></span>
 </div>
 </header>
@@ -775,146 +775,146 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <section>
 <div class="box notice <?= $ordersClosed ? 'closed' : '' ?>">
 <?php if ($deadline !== null): ?>
-<strong><?= $ordersClosed ? '閮撌脫甇? : '閮?芣迫??' ?></strong><br>
-<?= h(date('Y-m-d H:i', $deadline)) ?>嚗????
+<strong><?= $ordersClosed ? '訂單已截止' : '訂單截止時間' ?></strong><br>
+<?= h(date('Y-m-d H:i', $deadline)) ?>（台北時間）
 <?php else: ?>
-<strong>?桀??芾身摰??格甇Ｘ???/strong>
+<strong>尚未設定訂單截止時間</strong>
 <?php endif; ?>
 </div>
 <div class="box">
-<h2>??閮剖?</h2>
+<h2>????桀??</h2>
 <form method="post" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<label>??鈭?/label>
+<label>?????/label>
 <select name="organizer" required>
-<option value="">隢???犖</option>
+<option value="">?ｇ蹓????謢萇?</option>
 <?php foreach ($users as $name => $_balance): ?>
 <option value="<?= h($name) ?>" <?= ($settings['organizer'] ?? '') === $name ? 'selected' : '' ?>><?= h($name) ?></option>
 <?php endforeach; ?>
 </select>
-<label>閮?芣迫??嚗????</label>
+<label>?殉?謘???翰?蹇?????謅????</label>
 <div class="actions">
-<select name="deadline_date" aria-label="?芣迫?交?">
-<option value="">銝???/option>
+<select name="deadline_date" aria-label="???翰?鈭?">
+<option value="">?????/option>
 <?php foreach ($deadlineDates as $dateValue => $dateLabel): ?>
 <option value="<?= h($dateValue) ?>" <?= $selectedDeadlineDate === $dateValue ? 'selected' : '' ?>><?= h($dateLabel) ?></option>
 <?php endforeach; ?>
 </select>
-<select name="deadline_hour" aria-label="?芣迫撠?">
+<select name="deadline_hour" aria-label="???翰??">
 <?php for ($hour = 0; $hour < 24; $hour++): $hourValue = str_pad((string)$hour, 2, '0', STR_PAD_LEFT); ?>
 <option value="<?= $hourValue ?>" <?= $selectedDeadlineHour === $hourValue ? 'selected' : '' ?>><?= $hourValue ?> ??/option>
 <?php endfor; ?>
 </select>
-<select name="deadline_minute" aria-label="?芣迫??">
+<select name="deadline_minute" aria-label="???翰???">
 <?php foreach (['00', '10', '20', '30', '40', '50'] as $minuteValue): ?>
 <option value="<?= $minuteValue ?>" <?= $selectedDeadlineMinute === $minuteValue ? 'selected' : '' ?>><?= $minuteValue ?> ??/option>
 <?php endforeach; ?>
 </select>
 </div>
-<button name="public_action" value="update_group">?脣???鈭箄??芣迫??</button>
+<button name="public_action" value="update_group">???????剔?????翰?蹇?</button>
 </form>
 </div>
 <div class="box">
-<h2>?蝞∠?</h2>
+<h2>?謚軋????</h2>
 <span class="bubble-bg">??????/span>
 <form method="post" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <?php if ($menuLibrary): ?>
-<label>甇瑕?</label>
+<label>????謚軋?</label>
 <select name="history_menu_id">
-<option value="">銝??冽風?脰???/option>
+<option value="">?????賡◢?????/option>
 <?php foreach (array_reverse($menuLibrary, true) as $menuId => $menuItem): ?>
-<option value="<?= h($menuId) ?>"><?= h($menuItem['name'] ?? '?芸????) ?></option>
+<option value="<?= h($menuId) ?>"><?= h($menuItem['name'] ?? '歷史菜單') ?></option>
 <?php endforeach; ?>
 </select>
 <?php endif; ?>
-<label>銝?啗??桀???/label>
+<label>??蹌????獢???/label>
 <input type="file" name="menu_image" accept="image/jpeg,image/png,image/webp">
-<input type="text" name="menu_label" maxlength="60" placeholder="?啗??桀?蝔梧?銝敺?摮甇瑕嚗?>
-<button name="public_action" value="update_menu">憟甇瑕?嚗??單?</button>
+<input type="text" name="menu_label" maxlength="60" placeholder="????獢??╡???蹌行???殉朱?????>
+<button name="public_action" value="update_menu">??????謚軋?????殉??謚軋?</button>
 </form>
 <?php if ($menuLibrary): ?>
 <form method="post">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<label>蝺刻摩甇瑕??迂</label>
+<label>?箏?拍???謚軋????</label>
 <select name="history_menu_id" required>
 <?php foreach (array_reverse($menuLibrary, true) as $menuId => $menuItem): ?>
-<option value="<?= h($menuId) ?>"><?= h($menuItem['name'] ?? '?芸????) ?></option>
+<option value="<?= h($menuId) ?>"><?= h($menuItem['name'] ?? '歷史菜單') ?></option>
 <?php endforeach; ?>
 </select>
-<input type="text" name="history_menu_name" maxlength="60" placeholder="?啁???迂" required>
-<button name="public_action" value="rename_menu">?湔甇瑕??迂</button>
+<input type="text" name="history_menu_name" maxlength="60" placeholder="????謚軋????" required>
+<button name="public_action" value="rename_menu">?皝?????謚軋????</button>
 </form>
 <?php endif; ?>
 </div>
 <div class="box">
-<h2>蝯銝?</h2>
-<form method="post" onsubmit="return confirm('蝣箏?蝯嚗????砍?瘨祥?飛瑼????殷?銝虫?頛?CSV ?圈?餉??)">
+<h2>?荒?謘???</h2>
+<form method="post" onsubmit="return confirm('?????荒?謘?賹謕???謒????剁?蟡?蹓潮??澗??????畾?????CSV ??謕?擗??)">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<button class="success" name="public_action" value="settle_group" <?= $orders ? '' : 'disabled' ?>>蝯銝虫?頛?CSV</button>
+<button class="success" name="public_action" value="settle_group" <?= $orders ? '' : 'disabled' ?>>?荒?謘?????CSV</button>
 </form>
 </div>
 <div class="box">
-<h2>??暺?</h2>
-<label>雿輻???桀?擗?</label>
+<h2>????綜筐?</h2>
+<label>?輯撒?????獢??死?</label>
 <select id="user">
 <?php foreach ($balances as $name => $balance): ?>
-<option value="<?= h($name) ?>"><?= h($name) ?>嚗?<?= h($balance) ?>嚗?/option>
+<option value="<?= h($name) ?>"><?= h($name) ?>??<?= h($balance) ?>??/option>
 <?php endforeach; ?>
 </select>
 </div>
-<?php if (is_file($menuFile)): ?><div class="box menu-card"><div class="section-title"><h2>隞?</h2><span class="total-badge">暺??曉之?亦?</span></div><img class="menu" src="/?menu_image=1" alt="隞?"></div><?php endif; ?>
+<?php if (is_file($menuFile)): ?><div class="box menu-card"><div class="section-title"><h2>??謑?謚軋?</h2><span class="total-badge">?綜竣?????鈭?</span></div><img class="menu" src="/?menu_image=1" alt="??謑?謚軋?"></div><?php endif; ?>
 <div class="box">
-<div class="section-title"><h2>?啣?閮</h2><span class="total-badge"><?= $ordersClosed ? '撌脫甇? : '?銝? ?></span></div>
+<div class="section-title"><h2>?啣?閮</h2><span class="total-badge"><?= $ordersClosed ? '已截止' : '開放中' ?></span></div>
 <div class="order-form">
-<input id="item" maxlength="100" placeholder="??嚗?憒???憟嗉 敺桃?撠" required <?= $ordersClosed ? 'disabled' : '' ?>>
-<input id="price" type="number" min="1" max="100000" placeholder="?寞" required <?= $ordersClosed ? 'disabled' : '' ?>>
-<input class="wide" id="mood" maxlength="100" placeholder="隞敹?嚗?憒?隞予?喳???暺?啜???" <?= $ordersClosed ? 'disabled' : '' ?>>
+<input id="item" maxlength="100" placeholder="?蹓????縈?????????箸????? required <?= $ordersClosed ? 'disabled' : '' ?>>
+<input id="price" type="number" min="1" max="100000" placeholder="?撖僱" required <?= $ordersClosed ? 'disabled' : '' ?>>
+<input class="wide" id="mood" maxlength="100" placeholder="??謑?????縈???鈭????謚??綜窖?蹓魂??蹓????" <?= $ordersClosed ? 'disabled' : '' ?>>
 </div>
-<button class="success" onclick="createOrder()" <?= $ordersClosed ? 'disabled' : '' ?>><?= $ordersClosed ? '閮撌脫甇? : '?閮' ?></button>
+<button class="success" onclick="createOrder()" <?= $ordersClosed ? 'disabled' : '' ?>><?= $ordersClosed ? '訂單已截止' : '送出訂單' ?></button>
 </div>
 <div class="box">
-<div class="section-title"><h2>??隞閮</h2><span class="total-badge">?臭耨??/ ?芷</span></div>
+<div class="section-title"><h2>?????謑蹇?</h2><span class="total-badge">??剛??/ ??畸?</span></div>
 <div id="mine"></div>
 </div>
 </section>
 <aside class="sidebar">
 <div class="box">
-<div class="section-title"><h2>隞閮</h2><span class="total-badge"><?= count($currentOrders) ?> 蝑?/span></div>
-<table><thead><tr><th>憪? / ??</th><th>?寞</th><th>隞敹?</th></tr></thead><tbody>
+<div class="section-title"><h2>??謑蹇?</h2><span class="total-badge"><?= count($currentOrders) ?> ??/span></div>
+<table><thead><tr><th>?軋? / ?蹓?</th><th>?撖僱</th><th>??謑??</th></tr></thead><tbody>
 <?php foreach (array_reverse($currentOrders) as $order): ?>
-<tr><td><small class="muted"><?= h($order['user']) ?></small><br><?= h($order['item']) ?></td><td>$<?= h($order['price']) ?></td><td><?= h($order['mood'] ?? '??) ?></td></tr>
+<tr><td><small class="muted"><?= h($order['user']) ?></small><br><?= h($order['item']) ?></td><td>$<?= h($order['price']) ?></td><td><?= h($order['mood'] ?? '無') ?></td></tr>
 <?php endforeach; ?>
 </tbody></table>
 </div>
 <?php if (!empty($_SESSION['is_admin'])): ?>
 <div class="box admin">
-<h2>蝞∠???/h2>
+<h2>?????/h2>
 <form method="post">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<label>靽格?犖?桀?擗?</label>
+<label>?賣?????獢??死?</label>
 <select name="balance_user" required>
 <?php foreach ($balances as $name => $balance): ?>
-<option value="<?= h($name) ?>"><?= h($name) ?>嚗??$<?= h($balance) ?>嚗?/option>
+<option value="<?= h($name) ?>"><?= h($name) ?>??謆??$<?= h($balance) ?>??/option>
 <?php endforeach; ?>
 </select>
-<input type="number" name="target_balance" placeholder="靽格敺?憿? required>
-<input type="text" name="balance_note" maxlength="120" placeholder="隤踵??嚗?憒??脣潦???耨甇??">
-<button name="admin_action" value="set_balance">?湔?犖擗?</button>
+<input type="number" name="target_balance" placeholder="?賣????? required>
+<input type="text" name="balance_note" maxlength="120" placeholder="?方葭??賹?????縈????瞏汕蹓????蹓箄函???">
+<button name="admin_action" value="set_balance">?皝?????死?</button>
 </form>
 <form method="post">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-<input type="text" name="user_name" maxlength="50" placeholder="雿輻????>
-<input type="number" name="initial_balance" placeholder="??擗?" value="0">
+<input type="text" name="user_name" maxlength="50" placeholder="?輯撒??????>
+<input type="number" name="initial_balance" placeholder="?豲??死?" value="0">
 <div class="actions">
-<button name="admin_action" value="add_user">?啣?</button>
-<button class="danger" name="admin_action" value="delete_user">?芷</button>
+<button name="admin_action" value="add_user">???</button>
+<button class="danger" name="admin_action" value="delete_user">??畸?</button>
 </div>
 </form>
-<h3>??靽格蝝??/h3>
+<h3>????賣?????/h3>
 <?php if ($balanceAudit): ?>
 <table>
-<thead><tr><th>?? / 鈭箏</th><th>?啣?</th><th>??</th></tr></thead>
+<thead><tr><th>?蹇? / ?剔???/th><th>???</th><th>?賹?</th></tr></thead>
 <tbody>
 <?php foreach ($balanceAudit as $audit): ?>
 <?php
@@ -922,38 +922,38 @@ $beforeAudit = $audit['before_balance'] ?? null;
 $afterAudit = $audit['after_balance'] ?? null;
 $amountAudit = (int)($audit['amount'] ?? 0);
 $actionLabels = [
-    'manual_adjust' => '??隤踵',
-    'settle_order' => '蝯??狡',
-    'add_user' => '?啣?鈭箏',
-    'delete_user' => '?芷鈭箏',
+    'manual_adjust' => '手動調整',
+    'settle_order' => '結單扣款',
+    'add_user' => '新增人員',
+    'delete_user' => '刪除人員',
 ];
 ?>
 <tr>
 <td><small class="muted"><?= h($audit['time'] ?? '') ?></small><br><?= h($audit['user'] ?? '') ?></td>
 <td>
-<?= h($actionLabels[$audit['action'] ?? ''] ?? ($audit['action'] ?? '?啣?')) ?><br>
+<?= h($actionLabels[$audit['action'] ?? ''] ?? ($audit['action'] ?? '???')) ?><br>
 <small class="muted">
-<?= $beforeAudit === null ? '?? : '$' . h($beforeAudit) ?> ??<?= $afterAudit === null ? '?? : '$' . h($afterAudit) ?>
-嚗??= $amountAudit >= 0 ? '+' : '' ?><?= h($amountAudit) ?>嚗?</small>
+<?= $beforeAudit === null ? '無' : '$' . h($beforeAudit) ?> → <?= $afterAudit === null ? '無' : '$' . h($afterAudit) ?>
+<small>變動：<?= $amountAudit >= 0 ? '+' : '' ?><?= h($amountAudit) ?></small>
 </td>
-<td><?= h(($audit['note'] ?? '') !== '' ? $audit['note'] : '??) ?></td>
+<td><?= h(($audit['note'] ?? '') !== '' ? $audit['note'] : '無') ?></td>
 </tr>
 <?php endforeach; ?>
 </tbody>
 </table>
 <?php else: ?>
-<p class="muted">撠??靽格蝝??/p>
+<p class="muted">?垓?????賣??????/p>
 <?php endif; ?>
-<p><a class="muted" href="/?logout=1">?餃</a></p>
+<p><a class="muted" href="/?logout=1">?擗</a></p>
 </div>
 <?php else: ?>
 <div class="box">
-<h2>蝞∠??∠??/h2>
+<h2>?????貝??/h2>
 <?php if ($loginError): ?><p style="color:var(--danger)"><?= h($loginError) ?></p><?php endif; ?>
 <form method="post">
-<input name="username" autocomplete="username" placeholder="撣唾?" required>
-<input type="password" name="password" autocomplete="current-password" placeholder="撖Ⅳ" required>
-<button name="admin_login" value="1">?餃</button>
+<input name="username" autocomplete="username" placeholder="???" required>
+<input type="password" name="password" autocomplete="current-password" placeholder="???? required>
+<button name="admin_login" value="1">?擗</button>
 </form>
 </div>
 <?php endif; ?>
@@ -963,19 +963,19 @@ $actionLabels = [
 <section class="box admin history-panel">
 <div class="section-title">
 <div>
-<h2>瘥望風?脤???/h2>
-<small class="muted">蝯敺?閮??蝥????臭??望活?亦???/small>
+<h2>?伍??◢?????/h2>
+<small class="muted">?荒?謘???殉?謘????伐??謕??????暑?鈭???/small>
 </div>
 <span class="total-badge"><?= count($weeklyHistory) ?> ??/span>
 </div>
 <?php if ($weeklyHistory): ?>
 <form method="get">
-<label for="historyWeek">?豢??望活</label>
+<label for="historyWeek">?鞊???暑</label>
 <select id="historyWeek" name="history_week" onchange="this.form.submit()">
 <?php foreach ($weeklyHistory as $weekStart => $weekOrders): ?>
 <?php $weekEnd = (new DateTimeImmutable($weekStart))->modify('+6 days')->format('Y-m-d'); ?>
 <option value="<?= h($weekStart) ?>" <?= $selectedHistoryWeek === $weekStart ? 'selected' : '' ?>>
-<?= h($weekStart) ?> 嚚?<?= h($weekEnd) ?>嚗??= count($weekOrders) ?> 蝑?
+<?= h($weekStart) ?> ??<?= h($weekEnd) ?>???= count($weekOrders) ?> ???
 </option>
 <?php endforeach; ?>
 </select>
@@ -985,54 +985,54 @@ $selectedWeekTotal = array_sum(array_map(static fn(array $order): int => (int)($
 $selectedWeekEnd = (new DateTimeImmutable($selectedHistoryWeek))->modify('+6 days')->format('Y-m-d');
 ?>
 <div class="history-summary">
-<div class="history-stat"><span class="muted">蝯梯???</span><strong><?= h($selectedHistoryWeek) ?><br><small>??<?= h($selectedWeekEnd) ?></small></strong></div>
-<div class="history-stat"><span class="muted">暺??/ 鈭箸</span><strong><?= count($selectedWeekOrders) ?> 蝑?/ <?= count($selectedWeekUserTotals) ?> 鈭?/strong></div>
-<div class="history-stat"><span class="muted">閮蝮賡?憿?/span><strong>$<?= h($selectedWeekTotal) ?></strong></div>
+<div class="history-stat"><span class="muted">?舀０??賹?</span><strong><?= h($selectedHistoryWeek) ?><br><small>??<?= h($selectedWeekEnd) ?></small></strong></div>
+<div class="history-stat"><span class="muted">?綜竣謘??/ ?剔捂??/span><strong><?= count($selectedWeekOrders) ?> ??/ <?= count($selectedWeekUserTotals) ?> ??/strong></div>
+<div class="history-stat"><span class="muted">?殉?謘鞈???/span><strong>$<?= h($selectedWeekTotal) ?></strong></div>
 </div>
-<h3>?犖蝯梯?</h3>
+<h3>????舀０?</h3>
 <div class="history-table-wrap">
-<table><thead><tr><th>鈭箏</th><th>暺??/th><th>瘨祥??</th></tr></thead><tbody>
+<table><thead><tr><th>?剔???/th><th>?綜竣謘??/th><th>?剁?蟡???</th></tr></thead><tbody>
 <?php foreach ($selectedWeekUserTotals as $name => $totals): ?>
-<tr><td><?= h($name) ?></td><td><?= h($totals['count']) ?> 蝑?/td><td>$<?= h($totals['total']) ?></td></tr>
+<tr><td><?= h($name) ?></td><td><?= h($totals['count']) ?> ??/td><td>$<?= h($totals['total']) ?></td></tr>
 <?php endforeach; ?>
 </tbody></table>
 </div>
-<h3>??蝝??/h3>
+<h3>??????/h3>
 <div class="history-table-wrap">
-<table class="history-table"><thead><tr><th>?交???</th><th>銝鈭?/th><th>??</th><th>??</th><th>隞敹?</th><th>???/th></tr></thead><tbody>
+<table class="history-table"><thead><tr><th>?鈭??蹇?</th><th>??謘?/th><th>?蹓?</th><th>???</th><th>??謑??</th><th>????/th></tr></thead><tbody>
 <?php foreach ($selectedWeekOrders as $order): ?>
-<?php $isPending = ($order['history_status'] ?? '') === '?芰???; ?>
+<?php $isPending = ($order['history_status'] ?? '') === '未結單'; ?>
 <tr>
 <td><?= h($order['date'] ?? '') ?><br><small class="muted"><?= h($order['time'] ?? '') ?></small></td>
 <td><?= h($order['user'] ?? '') ?></td>
 <td><?= h($order['item'] ?? '') ?></td>
 <td>$<?= h($order['price'] ?? 0) ?></td>
-<td><?= h($order['mood'] ?? '??) ?></td>
-<td><span class="status-tag <?= $isPending ? 'pending' : '' ?>"><?= h($order['history_status'] ?? '撌脩???) ?></span></td>
+<td><?= h($order['mood'] ?? '無') ?></td>
+<td><span class="status-tag <?= $isPending ? 'pending' : '' ?>"><?= h($order['history_status'] ?? '已結單') ?></span></td>
 </tr>
 <?php endforeach; ?>
 </tbody></table>
 </div>
 <?php else: ?>
-<p class="muted">?桀?撠甇瑕暺鞈?嚗洵銝甈∠??桀???＊蝷箏?ㄐ??/p>
+<p class="muted">?獢??垓????綜竣謘????瘣菟??????獢???賂?????瑞?謓?謕???/p>
 <?php endif; ?>
 </section>
 <?php endif; ?>
 </div>
 <dialog id="orderUserDialog" class="order-dialog">
 <div class="order-dialog-card">
-<h2>隢Ⅱ隤??桐犖</h2>
-<p>?敺?甇伐?隢?憌脫??航狐閮???/p>
-<label for="orderUser">?祆活銝鈭?/label>
+<h2>?ｇ??⊿???獢?</h2>
+<p>???綽?????ｇ蹓??倦謕?????芰??殉????/p>
+<label for="orderUser">?蟡暑??謘?/label>
 <select id="orderUser" required>
-<option value="">隢?犖??/option>
+<option value="">?ｇ蹓??函???/option>
 <?php foreach ($balances as $name => $balance): ?>
-<option value="<?= h($name) ?>"><?= h($name) ?>嚗?<?= h($balance) ?>嚗?/option>
+<option value="<?= h($name) ?>"><?= h($name) ?>??<?= h($balance) ?>??/option>
 <?php endforeach; ?>
 </select>
 <div class="actions">
-<button type="button" class="secondary" onclick="closeOrderUserDialog()">餈?靽格</button>
-<button type="button" class="success" onclick="confirmOrderUser()">蝣箄??</button>
+<button type="button" class="secondary" onclick="closeOrderUserDialog()">擗???賣??/button>
+<button type="button" class="success" onclick="confirmOrderUser()">?????蹓鳴</button>
 </div>
 </div>
 </dialog>
@@ -1046,14 +1046,14 @@ const orderUserEl=document.getElementById('orderUser');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(payload){
   const response=await fetch('/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,csrf})});
-  const data=await response.json().catch(()=>({error:'??憭望?'}));
-  if(!response.ok)throw new Error(data.error||'??憭望?');
+  const data=await response.json().catch(()=>({error:'????剜??'}));
+  if(!response.ok)throw new Error(data.error||'????剜??');
   return data;
 }
 async function createOrder(){
-  if(ordersClosed)return alert('閮撌脫甇?);
+  if(ordersClosed)return alert('訂單已截止');
   const item=document.getElementById('item').value.trim(),price=Number(document.getElementById('price').value);
-  if(!item||!Number.isInteger(price)||price<=0)return alert('隢撓?亙???甇?Ⅱ?寞');
+  if(!item||!Number.isInteger(price)||price<=0)return alert('?ｇ???鈭????????撖僱');
   orderUserEl.value='';
   orderUserDialog.showModal();
   orderUserEl.focus();
@@ -1063,32 +1063,32 @@ function closeOrderUserDialog(){
 }
 async function confirmOrderUser(){
   const user=orderUserEl.value;
-  if(!user)return alert('隢??豢?銝鈭?);
+  if(!user)return alert('請選擇下單人');
   const item=document.getElementById('item').value.trim(),price=Number(document.getElementById('price').value);
   if(!item||!Number.isInteger(price)||price<=0){
     orderUserDialog.close();
-    return alert('隢撓?亙???甇?Ⅱ?寞');
+    return alert('?ｇ???鈭????????撖僱');
   }
   userEl.value=user;
   await api({action:'create',user,item,price,mood:document.getElementById('mood').value});
   location.reload();
 }
 async function removeOrder(id){
-  if(ordersClosed)return alert('閮撌脫甇?);
-  if(!confirm('蝣箏??芷甇方??殷?'))return;
+  if(ordersClosed)return alert('訂單已截止');
+  if(!confirm('??????畸????畾?'))return;
   await api({action:'delete',user:userEl.value,id});location.reload();
 }
 async function editOrder(id){
-  if(ordersClosed)return alert('閮撌脫甇?);
+  if(ordersClosed)return alert('訂單已截止');
   const order=orders.find(o=>o.id===id);
-  const item=prompt('??',order.item);if(item===null)return;
-  const price=Number(prompt('?寞',order.price));if(!item.trim()||!Number.isInteger(price)||price<=0)return alert('頛詨銝迤蝣?);
-  const mood=prompt('隞敹?',order.mood||'??);if(mood===null)return;
+  const item=prompt('?蹓?',order.item);if(item===null)return;
+  const price=Number(prompt('?寞',order.price));if(!item.trim()||!Number.isInteger(price)||price<=0)return alert('輸入不正確');
+  const mood=prompt('隞敹?',order.mood||'無');if(mood===null)return;
   await api({action:'edit',user:userEl.value,id,item:item.trim(),price,mood});location.reload();
 }
 function renderMine(){
   const mine=orders.filter(o=>o.user===userEl.value);
-  document.getElementById('mine').innerHTML=mine.length?mine.map(o=>`<div class="order"><b>${esc(o.item)}</b>?$${o.price}<br><small class="muted">${esc(o.mood||'??)} ${esc(o.time)}</small>${ordersClosed?'':`<div class="actions"><button onclick="editOrder('${o.id}')">靽格</button><button class="danger" onclick="removeOrder('${o.id}')">?芷</button></div>`}</div>`).join(''):'<p class="muted">?桀?瘝?閮</p>';
+  document.getElementById('mine').innerHTML=mine.length?mine.map(o=>`<div class="order"><b>${esc(o.item)}</b> $${o.price}<br><small class="muted">${esc(o.mood||'無')} ${esc(o.time)}</small>${ordersClosed?'':`<div class="actions"><button onclick="editOrder('${o.id}')">靽格</button><button class="danger" onclick="removeOrder('${o.id}')">?芷</button></div>`}</div>`).join(''):'<p class="muted">?桀?瘝?閮</p>';
 }
 userEl.addEventListener('change',renderMine);renderMine();
 </script>
