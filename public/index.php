@@ -646,7 +646,24 @@ $users = loadUsers($usersFile);
 $orders = loadOrders($ordersFile);
 $settings = loadSettings($settingsFile);
 $menuLibrary = loadMenuLibrary($menuLibraryFile);
-$balanceAudit = loadBalanceAudit($balanceAuditFile, 50);
+$balanceAudit = loadBalanceAudit($balanceAuditFile, 500);
+$auditDates = [];
+$selectedAuditDate = '';
+$selectedAuditItems = [];
+foreach ($balanceAudit as $audit) {
+    $auditDate = substr((string)($audit['time'] ?? ''), 0, 10);
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $auditDate)) {
+        $auditDates[$auditDate] = $auditDate;
+    }
+}
+$requestedAuditDate = trim((string)($_GET['audit_date'] ?? ''));
+if (isset($auditDates[$requestedAuditDate])) {
+    $selectedAuditDate = $requestedAuditDate;
+    $selectedAuditItems = array_values(array_filter(
+        $balanceAudit,
+        static fn(array $audit): bool => str_starts_with((string)($audit['time'] ?? ''), $requestedAuditDate)
+    ));
+}
 $weeklyHistory = [];
 $selectedHistoryWeek = '';
 $selectedWeekOrders = [];
@@ -669,9 +686,7 @@ if (!empty($_SESSION['is_admin'])) {
     krsort($weeklyHistory);
     $requestedWeek = trim((string)($_GET['history_week'] ?? ''));
     $currentWeek = orderWeekStart(date('Y-m-d')) ?? '';
-    $selectedHistoryWeek = isset($weeklyHistory[$requestedWeek])
-        ? $requestedWeek
-        : (isset($weeklyHistory[$currentWeek]) ? $currentWeek : (string)(array_key_first($weeklyHistory) ?? ''));
+    $selectedHistoryWeek = isset($weeklyHistory[$requestedWeek]) ? $requestedWeek : '';
     $selectedWeekOrders = $selectedHistoryWeek !== '' ? $weeklyHistory[$selectedHistoryWeek] : [];
     usort($selectedWeekOrders, static fn(array $a, array $b): int => strcmp(
         (string)($b['date'] ?? '') . ' ' . (string)($b['time'] ?? ''),
@@ -912,11 +927,22 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 </div>
 </form>
 <h3>金額修改紀錄</h3>
-<?php if ($balanceAudit): ?>
+<?php if ($auditDates): ?>
+<form method="get">
+<?php if ($selectedHistoryWeek !== ''): ?><input type="hidden" name="history_week" value="<?= h($selectedHistoryWeek) ?>"><?php endif; ?>
+<label for="auditDate">選擇日期</label>
+<select id="auditDate" name="audit_date" onchange="this.form.submit()">
+<option value="">請選擇日期後查看</option>
+<?php foreach ($auditDates as $auditDate): ?>
+<option value="<?= h($auditDate) ?>" <?= $selectedAuditDate === $auditDate ? 'selected' : '' ?>><?= h($auditDate) ?></option>
+<?php endforeach; ?>
+</select>
+</form>
+<?php if ($selectedAuditDate !== ''): ?>
 <table>
 <thead><tr><th>時間 / 人員</th><th>動作</th><th>備註</th></tr></thead>
 <tbody>
-<?php foreach ($balanceAudit as $audit): ?>
+<?php foreach ($selectedAuditItems as $audit): ?>
 <?php
 $beforeAudit = $audit['before_balance'] ?? null;
 $afterAudit = $audit['after_balance'] ?? null;
@@ -941,6 +967,7 @@ $actionLabels = [
 <?php endforeach; ?>
 </tbody>
 </table>
+<?php endif; ?>
 <?php else: ?>
 <p class="muted">尚無修改紀錄。</p>
 <?php endif; ?>
@@ -970,8 +997,10 @@ $actionLabels = [
 </div>
 <?php if ($weeklyHistory): ?>
 <form method="get">
+<?php if ($selectedAuditDate !== ''): ?><input type="hidden" name="audit_date" value="<?= h($selectedAuditDate) ?>"><?php endif; ?>
 <label for="historyWeek">選擇週次</label>
 <select id="historyWeek" name="history_week" onchange="this.form.submit()">
+<option value="">請選擇週次後查看</option>
 <?php foreach ($weeklyHistory as $weekStart => $weekOrders): ?>
 <?php $weekEnd = (new DateTimeImmutable($weekStart))->modify('+6 days')->format('Y-m-d'); ?>
 <option value="<?= h($weekStart) ?>" <?= $selectedHistoryWeek === $weekStart ? 'selected' : '' ?>>
@@ -980,6 +1009,7 @@ $actionLabels = [
 <?php endforeach; ?>
 </select>
 </form>
+<?php if ($selectedHistoryWeek !== ''): ?>
 <?php
 $selectedWeekTotal = array_sum(array_map(static fn(array $order): int => (int)($order['price'] ?? 0), $selectedWeekOrders));
 $selectedWeekEnd = (new DateTimeImmutable($selectedHistoryWeek))->modify('+6 days')->format('Y-m-d');
@@ -1013,6 +1043,7 @@ $selectedWeekEnd = (new DateTimeImmutable($selectedHistoryWeek))->modify('+6 day
 <?php endforeach; ?>
 </tbody></table>
 </div>
+<?php endif; ?>
 <?php else: ?>
 <p class="muted">目前尚無歷史點單資料，第一次結單後會自動顯示在這裡。</p>
 <?php endif; ?>
