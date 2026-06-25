@@ -1,7 +1,12 @@
 <?php
 declare(strict_types=1);
 
+const SESSION_COOKIE_NAME = 'order_system_session_v3';
+
+session_name(SESSION_COOKIE_NAME);
 session_start([
+    'cookie_lifetime' => 0,
+    'cookie_path' => '/',
     'cookie_httponly' => true,
     'cookie_samesite' => 'Lax',
     'cookie_secure' => (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'),
@@ -265,6 +270,15 @@ function requireAdmin(): void
 }
 
 if (isset($_GET['logout'])) {
+    foreach ([SESSION_COOKIE_NAME, 'PHPSESSID'] as $cookieName) {
+        setcookie($cookieName, '', [
+            'expires' => time() - 3600,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Lax',
+            'secure' => (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'),
+        ]);
+    }
     session_destroy();
     header('Location: /');
     exit;
