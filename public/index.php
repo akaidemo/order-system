@@ -758,7 +758,8 @@ button:hover{filter:brightness(.98);transform:translateY(-1px)}.success{backgrou
 .actions .danger{border-radius:8px 16px 8px 16px}.actions button:not(.danger){border-radius:999px}
 .notice{background:var(--panel-strong);border-color:var(--primary);text-align:center;font-weight:700}.closed{border-color:var(--danger);color:#991b1b;background:#fee2e2}
 button:disabled,input:disabled{opacity:.5;cursor:not-allowed;transform:none}.menu{width:100%;border-radius:20px;display:block;border:1px solid #fed7aa}
-.menu-card{overflow:hidden;padding:10px}.order{padding:13px;border:1px solid #ffedd5;border-radius:16px;margin-top:10px;background:#fffaf5}
+.menu-card{overflow:hidden;padding:10px}.menu-zoom-trigger{display:block;width:100%;padding:0;margin:0;background:transparent;border:0;box-shadow:none;border-radius:20px;cursor:zoom-in}.menu-zoom-trigger:hover{filter:none;transform:none}.menu-dialog{width:min(1100px,calc(100% - 28px));max-height:92vh;padding:0;border:0;border-radius:24px;background:#fffaf5;box-shadow:0 28px 90px rgba(67,34,15,.45)}.menu-dialog::backdrop{background:rgba(67,34,15,.72);backdrop-filter:blur(3px)}.menu-dialog-card{position:relative;padding:16px}.menu-dialog img{width:100%;max-height:82vh;object-fit:contain;border-radius:18px;display:block;background:#fff}.menu-close{position:absolute;right:24px;top:24px;width:auto;padding:9px 13px;margin:0;border-radius:999px;background:#fff;color:#9a3412;border:1px solid #fdba74;box-shadow:0 8px 18px rgba(120,53,15,.2)}
+.order{padding:13px;border:1px solid #ffedd5;border-radius:16px;margin-top:10px;background:#fffaf5}
 .actions{display:flex;gap:8px}.actions>*{flex:1;min-width:0}.actions button{padding:9px}.admin{border-color:#86efac}
 .order-form{display:grid;grid-template-columns:1.2fr .6fr;gap:10px}.order-form .wide{grid-column:1/-1}
 table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:left;padding:10px;background:#fffaf5}th{color:var(--dim);font-size:.78rem;text-transform:uppercase}td:first-child,th:first-child{border-radius:12px 0 0 12px}td:last-child,th:last-child{border-radius:0 12px 12px 0}
@@ -878,7 +879,7 @@ table{width:100%;border-collapse:separate;border-spacing:0 8px}td,th{text-align:
 <?php endforeach; ?>
 </select>
 </div>
-<?php if (is_file($menuFile)): ?><div class="box menu-card"><div class="section-title"><h2>今日菜單</h2><span class="total-badge">目前使用中</span></div><img class="menu" src="/?menu_image=1" alt="今日菜單"></div><?php endif; ?>
+<?php if (is_file($menuFile)): ?><div class="box menu-card"><div class="section-title"><h2>今日菜單</h2><span class="total-badge">點擊放大</span></div><button type="button" class="menu-zoom-trigger" onclick="openMenuPreview()" aria-label="放大今日菜單"><img class="menu" src="/?menu_image=1" alt="今日菜單"></button></div><?php endif; ?>
 <div class="box">
 <div class="section-title"><h2>新增訂單</h2><span class="total-badge"><?= $ordersClosed ? '已截止' : '開放中' ?></span></div>
 <div class="order-form">
@@ -1067,6 +1068,14 @@ $selectedWeekEnd = (new DateTimeImmutable($selectedHistoryWeek))->modify('+6 day
 </div>
 </div>
 </dialog>
+<?php if (is_file($menuFile)): ?>
+<dialog id="menuPreviewDialog" class="menu-dialog" onclick="closeMenuPreviewFromBackdrop(event)">
+<div class="menu-dialog-card">
+<button type="button" class="menu-close" onclick="closeMenuPreview()">關閉</button>
+<img src="/?menu_image=1" alt="放大的今日菜單">
+</div>
+</dialog>
+<?php endif; ?>
 <script>
 const csrf=<?= json_encode($_SESSION['csrf']) ?>;
 const ordersClosed=<?= $ordersClosed ? 'true' : 'false' ?>;
@@ -1074,7 +1083,17 @@ let orders=<?= json_encode($currentOrders, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG
 const userEl=document.getElementById('user');
 const orderUserDialog=document.getElementById('orderUserDialog');
 const orderUserEl=document.getElementById('orderUser');
+const menuPreviewDialog=document.getElementById('menuPreviewDialog');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function openMenuPreview(){
+  if(menuPreviewDialog)menuPreviewDialog.showModal();
+}
+function closeMenuPreview(){
+  if(menuPreviewDialog)menuPreviewDialog.close();
+}
+function closeMenuPreviewFromBackdrop(event){
+  if(event.target===menuPreviewDialog)closeMenuPreview();
+}
 async function api(payload){
   const response=await fetch('/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,csrf})});
   const data=await response.json().catch(()=>({error:'系統回應錯誤'}));
